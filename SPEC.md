@@ -1,7 +1,7 @@
 # SPEC — LevelDeck
 
 > Deriva de `INTENT.md`. Si algo aquí contradice el intent, manda el intent.
-> Estado: borrador v1
+> Estado: borrador v1.1 (decisiones de la Fase 0 incorporadas)
 
 ## 1. Resumen
 
@@ -33,7 +33,8 @@ Sin servidores externos, sin cuentas y sin dependencias de terceros.
 leveldeck/
 ├── INTENT.md
 ├── SPEC.md
-├── LevelDeck.xcworkspace
+├── project.yml        # XcodeGen: fuente de verdad del proyecto y los targets
+├── Configs/           # xcconfig compartido; Local.xcconfig (Team ID) fuera de git
 ├── LevelDeckAgent/    # target macOS (app de barra de menú)
 ├── LevelDeck/         # target iOS
 └── Packages/
@@ -44,6 +45,8 @@ leveldeck/
 ```
 
 La lógica de protocolo y transporte vive en `LevelDeckKit` y se prueba de forma aislada.
+
+El proyecto de Xcode se genera con `xcodegen generate` a partir de `project.yml` y no se versiona (`*.xcodeproj` está en `.gitignore`). No hay `.xcworkspace`: el paquete local se referencia desde `project.yml`. Bundle IDs: `com.renandiaz.LevelDeckAgent` (macOS) y `com.renandiaz.LevelDeck` (iOS).
 
 ## 5. Agente macOS
 
@@ -97,6 +100,8 @@ Reglas:
 
 ### 6.3 Requisitos de Info.plist
 
+Se agregan en la fase que los usa (red local y Bonjour en la Fase 2; cámara en la Fase 3), no antes.
+
 - `NSLocalNetworkUsageDescription`: texto explicando que se usa para encontrar la Mac.
 - `NSBonjourServices`: `_leveldeck._tcp`.
 - `NSCameraUsageDescription`: para escanear el QR de emparejamiento.
@@ -113,7 +118,7 @@ La clave nunca viaja por la red: el QR es el canal fuera de banda.
 
 ## 8. Protocolo
 
-Mensajes JSON sobre WebSocket. Todos incluyen `type`. El protocolo tiene versión: `v: 1`.
+Mensajes JSON sobre WebSocket. Todos incluyen `type` y el payload va plano, al mismo nivel que `type`. El protocolo tiene versión (`v: 1`), que solo viaja en `hello` y `state`: el handshake la negocia, y los comandos no la repiten.
 
 ### Cliente → Agente
 
@@ -129,7 +134,7 @@ Mensajes JSON sobre WebSocket. Todos incluyen `type`. El protocolo tiene versió
 | type | payload |
 |---|---|
 | `state` | Snapshot completo (ver abajo). Se envía tras `hello` y ante cualquier cambio. |
-| `error` | `{ code, message }`. Códigos: `unsupportedVersion`, `notSettable`, `deviceNotFound`. |
+| `error` | `{ code, message }`. Códigos: `unsupportedVersion`, `notSettable`, `deviceNotFound`, `invalidValue`. |
 
 ```json
 {
@@ -148,6 +153,8 @@ Mensajes JSON sobre WebSocket. Todos incluyen `type`. El protocolo tiene versió
 
 El `deviceId` es el UID del dispositivo (`kAudioDevicePropertyDeviceUID`), no el `AudioObjectID`, porque el UID es estable entre reinicios.
 
+Un `setVolume` con `value` fuera de 0.0–1.0 (o `NaN`) es inválido: no se recorta. `LevelDeckKit` se niega a codificarlo y lo rechaza al decodificar, y el agente responde `error` con `invalidValue`. Un `type` desconocido o un campo faltante también son errores de decodificación.
+
 Se envía siempre el snapshot completo, no diffs. El payload es pequeño y así se evita todo un tipo de bugs de sincronización. Durante un arrastre, los envíos de `state` se agrupan (coalescing) a un máximo de 30 por segundo.
 
 ## 9. Fases
@@ -155,7 +162,7 @@ Se envía siempre el snapshot completo, no diffs. El payload es pequeño y así 
 Cada fase termina con algo que se puede usar y probar.
 
 **Fase 0 — Esqueleto.** Workspace, dos targets, paquete `LevelDeckKit` con los modelos del protocolo y sus tests de codificación y decodificación.
-*Listo cuando:* compilan ambos targets y pasan los tests de `LevelDeckKit`.
+*Listo cuando:* `xcodegen generate` funciona, compilan ambos targets con `xcodebuild` y pasan los tests de `LevelDeckKit` (`scripts/verify.sh`, que también corre en CI sobre `macos-15`).
 
 **Fase 1 — Audio en la Mac.** `AudioController` con volumen y mute de salida, más listeners. El menú muestra un slider que refleja y controla el volumen.
 *Listo cuando:* mover el slider cambia el volumen del sistema, y cambiar el volumen con el teclado mueve el slider.

@@ -1,0 +1,2 @@
+// Copia este archivo a Configs/Local.xcconfig (está en .gitignore) y pon tu Team ID.
+DEVELOPMENT_TEAM = XXXXXXXXXX
