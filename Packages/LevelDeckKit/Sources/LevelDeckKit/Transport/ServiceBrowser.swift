@@ -31,8 +31,10 @@ public final class ServiceBrowser {
 
     public func start() {
         guard browser == nil else { return }
+        // `bonjourWithTXTRecord`: el descriptor `bonjour` plano no entrega el TXT, y sin él el
+        // iPhone no puede leer el `agentId` de la Mac (SPEC §5.3, §7).
         let browser = NWBrowser(
-            for: .bonjour(type: LevelDeckService.bonjourType, domain: nil),
+            for: .bonjourWithTXTRecord(type: LevelDeckService.bonjourType, domain: nil),
             using: NWParameters()
         )
         browser.stateUpdateHandler = { [weak self] state in

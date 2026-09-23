@@ -107,7 +107,14 @@ struct DiscoveryView: View {
             }
         } else {
             HStack {
-                Label(agent.name, systemImage: "desktopcomputer")
+                VStack(alignment: .leading, spacing: 2) {
+                    Label(agent.name, systemImage: "desktopcomputer")
+                    #if DEBUG
+                    Text(verbatim: agent.agentID.map { "id \($0)" } ?? "sin TXT id")
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.tertiary)
+                    #endif
+                }
                 Spacer()
                 Button("Pair") {
                     isPairing = true
