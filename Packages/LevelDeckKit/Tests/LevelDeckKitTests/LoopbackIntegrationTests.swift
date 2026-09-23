@@ -155,6 +155,11 @@ struct LoopbackIntegrationTests {
         )
         let recorder = MessageRecorder()
         client.onMessage = { recorder.record($0) }
+        let server = server
+        recorder.describeContext = { [weak client] in
+            "cliente=\(client.map { "\($0.status)" } ?? "nil") servidor=\(server.status) "
+                + "clientes=\(server.clients.map(\.deviceName))"
+        }
         client.connect()
         return (client, recorder)
     }
@@ -194,6 +199,8 @@ struct TimeoutError: Error, CustomStringConvertible {
 @MainActor
 final class MessageRecorder {
     private var buffer: [AgentMessage] = []
+    /// Estado de cliente y servidor para el mensaje de timeout.
+    var describeContext: (@MainActor () -> String)?
     private var waiter: (id: UUID, continuation: CheckedContinuation<AgentMessage, any Error>)?
 
     func record(_ message: AgentMessage) {
@@ -222,7 +229,9 @@ final class MessageRecorder {
     private func expire(_ id: UUID, after timeout: Duration) {
         guard let waiter, waiter.id == id else { return }
         self.waiter = nil
-        waiter.continuation.resume(throwing: TimeoutError(description: "Sin mensaje en \(timeout)"))
+        waiter.continuation.resume(throwing: TimeoutError(
+            description: "Sin mensaje en \(timeout); \(describeContext?() ?? "sin contexto")"
+        ))
     }
 
     func nextState() async throws -> StateSnapshot {
