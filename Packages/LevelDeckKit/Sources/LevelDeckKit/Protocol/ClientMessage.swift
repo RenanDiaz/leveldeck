@@ -1,6 +1,8 @@
 /// Mensajes Cliente → Agente (SPEC §8).
 public enum ClientMessage: Sendable, Equatable {
-    case hello(deviceName: String, version: Int = ProtocolVersion.current)
+    /// `deviceId` es la identidad PSK que la Mac asignó al emparejar (SPEC §7). Va siempre
+    /// con TLS-PSK; solo falta en el transporte en claro de desarrollo.
+    case hello(deviceName: String, version: Int = ProtocolVersion.current, deviceId: String? = nil)
     case setVolume(scope: Scope, value: Float)
     case setMute(scope: Scope, muted: Bool)
     case setDefaultDevice(scope: Scope, deviceId: String)
@@ -21,7 +23,8 @@ extension ClientMessage: Codable {
         case .hello:
             self = .hello(
                 deviceName: try container.decode(String.self, forKey: .deviceName),
-                version: try container.decode(Int.self, forKey: .v)
+                version: try container.decode(Int.self, forKey: .v),
+                deviceId: try container.decodeIfPresent(String.self, forKey: .deviceId)
             )
         case .setVolume:
             let value = try container.decode(Float.self, forKey: .value)
@@ -48,10 +51,11 @@ extension ClientMessage: Codable {
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         switch self {
-        case let .hello(deviceName, version):
+        case let .hello(deviceName, version, deviceId):
             try container.encode(MessageType.hello, forKey: .type)
             try container.encode(version, forKey: .v)
             try container.encode(deviceName, forKey: .deviceName)
+            try container.encodeIfPresent(deviceId, forKey: .deviceId)
         case let .setVolume(scope, value):
             guard Volume.isValid(value) else {
                 throw EncodingError.invalidValue(

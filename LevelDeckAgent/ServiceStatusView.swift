@@ -2,6 +2,7 @@ import LevelDeckKit
 import SwiftUI
 
 /// Estado del servicio de red en el menú: nombre anunciado, puerto y clientes conectados.
+/// La conexión va siempre por TLS-PSK (SPEC §5.3).
 struct ServiceStatusView: View {
     let server: LevelDeckServer
 
@@ -21,9 +22,6 @@ struct ServiceStatusView: View {
                     .font(.caption2.monospaced())
                     .foregroundStyle(.tertiary)
             }
-            Text("Unencrypted transport (Debug only)")
-                .font(.caption2)
-                .foregroundStyle(.orange)
             #endif
         }
     }

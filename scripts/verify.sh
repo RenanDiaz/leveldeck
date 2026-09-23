@@ -5,13 +5,14 @@ cd "$(dirname "$0")/.."
 
 DERIVED_DATA=build/DerivedData
 PRODUCTS="$DERIVED_DATA/Build/Products"
+KIT_BUILD=Packages/LevelDeckKit/.build
 # Marca del transporte en claro: el nombre del caso de TransportSecurity (SPEC §5.3).
 INSECURE_MARKER=insecurePlaintext
 
 echo "==> xcodegen generate"
 xcodegen generate
 
-echo "==> Tests de LevelDeckKit (incluye integración en loopback)"
+echo "==> Tests de LevelDeckKit (incluye integración en loopback con TLS-PSK)"
 swift test --package-path Packages/LevelDeckKit
 
 echo "==> Tests de LevelDeckAgentKit"
@@ -31,23 +32,23 @@ for configuration in Debug Release; do
   build LevelDeck 'generic/platform=iOS Simulator' "$configuration"
 done
 
-# El transporte en claro existe en Debug y no puede existir en Release. El chequeo en Debug
-# es el control positivo: prueba que la marca sería visible si el código estuviera compilado.
+# El transporte en claro existe solo en el build Debug de LevelDeckKit (donde corren los
+# tests) y no puede existir en las apps Release. El chequeo del build Debug del paquete es el
+# control positivo: prueba que la marca sería visible si el código estuviera compilado.
 check_insecure_transport() {
-  local app=$1 configuration=$2 expected=$3
-  if grep -rqa "$INSECURE_MARKER" "$app"; then found=yes; else found=no; fi
+  local what=$1 path=$2 expected=$3
+  if grep -rqa "$INSECURE_MARKER" "$path"; then found=yes; else found=no; fi
   if [[ $found != "$expected" ]]; then
-    echo "ERROR: transporte en claro en $app ($configuration): esperado=$expected, encontrado=$found" >&2
+    echo "ERROR: transporte en claro en $what: esperado=$expected, encontrado=$found" >&2
     exit 1
   fi
-  echo "    $configuration $(basename "$app"): transporte en claro presente=$found"
+  echo "    $what: transporte en claro presente=$found"
 }
 
-echo "==> Transporte en claro: solo en Debug"
-check_insecure_transport "$PRODUCTS/Debug/LevelDeckAgent.app" Debug yes
-check_insecure_transport "$PRODUCTS/Debug-iphonesimulator/LevelDeck.app" Debug yes
-check_insecure_transport "$PRODUCTS/Release/LevelDeckAgent.app" Release no
-check_insecure_transport "$PRODUCTS/Release-iphonesimulator/LevelDeck.app" Release no
+echo "==> Transporte en claro: solo en el build Debug de LevelDeckKit"
+check_insecure_transport "LevelDeckKit (Debug, swift test)" "$KIT_BUILD" yes
+check_insecure_transport "LevelDeckAgent.app (Release)" "$PRODUCTS/Release/LevelDeckAgent.app" no
+check_insecure_transport "LevelDeck.app (Release)" "$PRODUCTS/Release-iphonesimulator/LevelDeck.app" no
 
 echo "==> Localización: textos de las apps traducidos al español"
 python3 scripts/check-localizations.py

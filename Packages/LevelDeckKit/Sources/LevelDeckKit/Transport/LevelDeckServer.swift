@@ -22,8 +22,22 @@ public protocol LevelDeckServerDelegate: AnyObject {
     func handle(_ command: ClientMessage) -> AgentError?
 }
 
+/// Decide si un cliente que ya pasó el handshake puede usar la sesión (SPEC §7).
+@MainActor
+public protocol LevelDeckServerAuthorizer: AnyObject {
+    /// `deviceId` es la identidad que el cliente declaró en el `hello` (`nil` si no mandó).
+    /// Si devuelve `false`, el servidor responde `notPaired` y cierra.
+    func authorize(deviceId: String?, deviceName: String) -> Bool
+}
+
 /// Servidor del agente (SPEC §5.3): `NWListener` en un puerto dinámico, anunciado por
 /// Bonjour, con varios clientes simultáneos.
+///
+/// - Las claves TLS-PSK van en `security`. `update(security:)` reinicia el listener con el
+///   conjunto nuevo (puerto nuevo, mismo nombre Bonjour); las sesiones ya aceptadas son
+///   independientes del listener y siguen vivas. `disconnect(deviceId:)` cierra las de un
+///   dispositivo revocado.
+/// - Si hay `authorizer`, cada `hello` pasa por él; sin `authorizer` se acepta cualquiera.
 ///
 /// - Handshake: el primer mensaje debe ser `hello`. Si la versión no coincide se responde
 ///   `unsupportedVersion` y se cierra; cualquier otro mensaje antes de `hello` cierra la conexión.
@@ -45,6 +59,8 @@ public final class LevelDeckServer {
     public struct Client: Identifiable, Equatable, Sendable {
         public let id: UUID
         public let deviceName: String
+        /// Identidad declarada en el `hello` (SPEC §7).
+        public let deviceId: String?
     }
 
     public private(set) var status: Status = .stopped
@@ -58,10 +74,12 @@ public final class LevelDeckServer {
     }
 
     @ObservationIgnored public weak var delegate: (any LevelDeckServerDelegate)?
+    @ObservationIgnored public weak var authorizer: (any LevelDeckServerAuthorizer)?
 
-    private let security: TransportSecurity
+    @ObservationIgnored private var security: TransportSecurity
     private let advertise: Bool
     private let serviceName: String?
+    private let agentID: String?
     private let requiredInterfaceType: NWInterface.InterfaceType?
     @ObservationIgnored private var listener: NWListener?
     @ObservationIgnored private var sessions: [UUID: Session] = [:]
@@ -72,16 +90,19 @@ public final class LevelDeckServer {
     /// - Parameters:
     ///   - advertise: anunciar el servicio por Bonjour. Los tests en loopback lo apagan.
     ///   - serviceName: nombre Bonjour; `nil` usa el nombre de la Mac.
+    ///   - agentID: `agentId` de la Mac; se anuncia en el registro TXT (SPEC §7).
     ///   - requiredInterfaceType: limita el listener a una interfaz (p. ej. `.loopback`).
     public init(
         security: TransportSecurity,
         advertise: Bool = true,
         serviceName: String? = nil,
+        agentID: String? = nil,
         requiredInterfaceType: NWInterface.InterfaceType? = nil
     ) {
         self.security = security
         self.advertise = advertise
         self.serviceName = serviceName
+        self.agentID = agentID
         self.requiredInterfaceType = requiredInterfaceType
         broadcaster = ThrottledSender { [weak self] state in
             self?.broadcast(state)
@@ -90,6 +111,36 @@ public final class LevelDeckServer {
 
     public func start() {
         guard listener == nil else { return }
+        startListener()
+    }
+
+    /// Cambia el transporte (p. ej. el conjunto de PSK). Si el servicio está corriendo, el
+    /// listener se reinicia con el nuevo; las sesiones activas no se tocan.
+    public func update(security: TransportSecurity) {
+        self.security = security
+        guard let old = listener else { return }
+        detach(old)
+        old.cancel()
+        listener = nil
+        advertisedName = nil
+        startListener()
+    }
+
+    /// Cierra las sesiones del dispositivo, avisando `notPaired` antes (SPEC §7).
+    public func disconnect(deviceId: String) {
+        for session in sessions.values where session.deviceId == deviceId {
+            let sent = session.connection.send(
+                .error(code: .notPaired, message: "El dispositivo fue revocado.")
+            ) { [weak session] in
+                session?.connection.cancel()
+            }
+            if !sent {
+                session.connection.cancel()
+            }
+        }
+    }
+
+    private func startListener() {
         let parameters = security.makeParameters()
         if let requiredInterfaceType {
             parameters.requiredInterfaceType = requiredInterfaceType
@@ -105,7 +156,10 @@ public final class LevelDeckServer {
             return
         }
         if advertise {
-            listener.service = NWListener.Service(name: serviceName, type: LevelDeckService.bonjourType)
+            let txt = NWTXTRecord(agentID.map { [LevelDeckService.txtAgentIDKey: $0] } ?? [:])
+            listener.service = NWListener.Service(
+                name: serviceName, type: LevelDeckService.bonjourType, domain: nil, txtRecord: txt
+            )
         }
         listener.stateUpdateHandler = { [weak self] state in
             MainActor.assumeIsolated { self?.listenerStateChanged(state) }
@@ -122,7 +176,10 @@ public final class LevelDeckServer {
     }
 
     public func stop() {
-        listener?.cancel()
+        if let listener {
+            detach(listener)
+            listener.cancel()
+        }
         listener = nil
         for session in sessions.values {
             session.connection.cancel()
@@ -140,6 +197,13 @@ public final class LevelDeckServer {
     }
 
     // MARK: - Listener
+
+    /// Un listener reemplazado o detenido ya no toca el estado del servidor.
+    private func detach(_ listener: NWListener) {
+        listener.stateUpdateHandler = nil
+        listener.serviceRegistrationUpdateHandler = nil
+        listener.newConnectionHandler = nil
+    }
 
     private func listenerStateChanged(_ state: NWListener.State) {
         switch state {
@@ -202,7 +266,7 @@ public final class LevelDeckServer {
     }
 
     private func handle(_ message: ClientMessage, in session: Session) {
-        if case let .hello(deviceName, version) = message {
+        if case let .hello(deviceName, version, deviceId) = message {
             guard version == ProtocolVersion.current else {
                 let text = "Versión \(version) no soportada; el agente habla la v\(ProtocolVersion.current)."
                 session.connection.send(.error(code: .unsupportedVersion, message: text)) {
@@ -211,7 +275,16 @@ public final class LevelDeckServer {
                 }
                 return
             }
+            if let authorizer, !authorizer.authorize(deviceId: deviceId, deviceName: deviceName) {
+                connectionEvents.append("notPaired(\(deviceId ?? "sin deviceId"))")
+                session.connection.send(.error(code: .notPaired, message: "Dispositivo no emparejado.")) {
+                    [weak session] in
+                    session?.connection.cancel()
+                }
+                return
+            }
             session.deviceName = deviceName
+            session.deviceId = deviceId
             updateClients()
             if let state = delegate?.currentState() {
                 session.connection.send(.state(state))
@@ -253,7 +326,7 @@ public final class LevelDeckServer {
     private func updateClients() {
         clients = sessions.values
             .compactMap { session in
-                session.deviceName.map { Client(id: session.id, deviceName: $0) }
+                session.deviceName.map { Client(id: session.id, deviceName: $0, deviceId: session.deviceId) }
             }
             .sorted { $0.deviceName.localizedStandardCompare($1.deviceName) == .orderedAscending }
     }
@@ -279,6 +352,8 @@ private final class Session {
     let connection: MessageConnection<ClientMessage, AgentMessage>
     /// `nil` hasta que llega un `hello` válido.
     var deviceName: String?
+    /// Identidad declarada en el `hello`, si el cliente la mandó.
+    var deviceId: String?
 
     init(id: UUID, connection: MessageConnection<ClientMessage, AgentMessage>) {
         self.id = id

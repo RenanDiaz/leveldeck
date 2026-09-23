@@ -6,21 +6,21 @@ import SwiftUI
 @main
 struct LevelDeckAgentApp: App {
     @State private var audio: AudioModel
-    @State private var remote: RemoteService?
+    @State private var remote: RemoteService
 
     init() {
         let audio = AudioModel(controller: CoreAudioController())
         audio.start()
         _audio = State(initialValue: audio)
 
-        let remote = AgentTransport.security.map { RemoteService(audio: audio, security: $0) }
-        remote?.start()
+        let remote = RemoteService(audio: audio, store: KeychainPairedDeviceStore())
+        remote.start()
         _remote = State(initialValue: remote)
     }
 
     var body: some Scene {
         MenuBarExtra {
-            MenuContent(audio: audio, server: remote?.server)
+            MenuContent(audio: audio, remote: remote)
         } label: {
             // Template image: macOS lo tiñe según el modo claro/oscuro de la barra.
             Image("MenuBarIcon")
@@ -28,24 +28,32 @@ struct LevelDeckAgentApp: App {
         }
         // El estilo menú no admite sliders (SPEC §5.1).
         .menuBarExtraStyle(.window)
+
+        Window("Pair a New Device", id: PairingWindowView.windowID) {
+            PairingWindowView(remote: remote)
+        }
+        .windowResizability(.contentSize)
     }
 }
 
 private struct MenuContent: View {
     let audio: AudioModel
-    let server: LevelDeckServer?
+    let remote: RemoteService
+
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             ChannelControl(scope: .output, audio: audio)
             ChannelControl(scope: .input, audio: audio)
             Divider()
-            if let server {
-                ServiceStatusView(server: server)
-            } else {
-                Label("Network: requires TLS-PSK (phase 3)", systemImage: "lock")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            ServiceStatusView(server: remote.server)
+            Divider()
+            PairedDevicesView(pairing: remote.pairing)
+            Button("Pair New Device…") {
+                remote.pairing.beginPairing(agentName: remote.displayName)
+                openWindow(id: PairingWindowView.windowID)
+                NSApplication.shared.activate()
             }
             Divider()
             HStack {

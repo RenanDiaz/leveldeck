@@ -7,6 +7,8 @@
 	<array>
 		<string>_leveldeck._tcp</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>LevelDeck uses the camera to scan the pairing code shown on your Mac.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>LevelDeck uses the local network to find your Mac and control its volume.</string>
 </dict>

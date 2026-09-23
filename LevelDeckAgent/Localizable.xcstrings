@@ -21,12 +21,112 @@
         }
       }
     },
+    "A code is valid for 2 minutes. Show a new one and scan it with the iPhone.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un código vale 2 minutos. Muestra uno nuevo y escanéalo con el iPhone."
+          }
+        }
+      }
+    },
+    "Cancel": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelar"
+          }
+        }
+      }
+    },
+    "Close": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cerrar"
+          }
+        }
+      }
+    },
+    "Connected": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conectado"
+          }
+        }
+      }
+    },
+    "Couldn't access the Keychain. Pairing won't be saved.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo acceder al llavero. El emparejamiento no se guardará."
+          }
+        }
+      }
+    },
+    "Couldn't generate the QR code.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo generar el código QR."
+          }
+        }
+      }
+    },
+    "Couldn't save the pairing in the Keychain.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo guardar el emparejamiento en el llavero."
+          }
+        }
+      }
+    },
+    "Done": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listo"
+          }
+        }
+      }
+    },
+    "Expires in %@": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vence en %@"
+          }
+        }
+      }
+    },
     "Input": {
       "localizations": {
         "es": {
           "stringUnit": {
             "state": "translated",
             "value": "Entrada"
+          }
+        }
+      }
+    },
+    "It will connect automatically from now on. You can revoke it from the menu.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desde ahora se conectará solo. Puedes revocarlo desde el menú."
           }
         }
       }
@@ -51,16 +151,6 @@
         }
       }
     },
-    "Network: requires TLS-PSK (phase 3)": {
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Red: requiere TLS-PSK (Fase 3)"
-          }
-        }
-      }
-    },
     "No device": {
       "localizations": {
         "es": {
@@ -71,12 +161,82 @@
         }
       }
     },
+    "No paired devices yet.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todavía no hay dispositivos emparejados."
+          }
+        }
+      }
+    },
+    "Not connected": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No conectado"
+          }
+        }
+      }
+    },
+    "Open LevelDeck on the iPhone, tap Pair and point the camera at this code. The key never leaves this screen.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abre LevelDeck en el iPhone, toca Emparejar y apunta la cámara a este código. La clave nunca sale de esta pantalla."
+          }
+        }
+      }
+    },
     "Output": {
       "localizations": {
         "es": {
           "stringUnit": {
             "state": "translated",
             "value": "Salida"
+          }
+        }
+      }
+    },
+    "Pair New Device…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Emparejar nuevo dispositivo…"
+          }
+        }
+      }
+    },
+    "Pair a New Device": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Emparejar un dispositivo nuevo"
+          }
+        }
+      }
+    },
+    "Paired devices": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dispositivos emparejados"
+          }
+        }
+      }
+    },
+    "Pairing QR code": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Código QR de emparejamiento"
           }
         }
       }
@@ -101,6 +261,36 @@
         }
       }
     },
+    "Revoke": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revocar"
+          }
+        }
+      }
+    },
+    "Revoke “%@”": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revocar “%@”"
+          }
+        }
+      }
+    },
+    "Scan this code with LevelDeck on your iPhone.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escanea este código con LevelDeck en tu iPhone."
+          }
+        }
+      }
+    },
     "Service stopped": {
       "localizations": {
         "es": {
@@ -111,12 +301,42 @@
         }
       }
     },
+    "Show a New Code": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar un código nuevo"
+          }
+        }
+      }
+    },
     "Starting service…": {
       "localizations": {
         "es": {
           "stringUnit": {
             "state": "translated",
             "value": "Iniciando servicio…"
+          }
+        }
+      }
+    },
+    "The code expired.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El código venció."
+          }
+        }
+      }
+    },
+    "The iPhone was refused so it doesn't keep a key the Mac won't remember. Fix Keychain access and show a new code.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se rechazó al iPhone para que no se quede con una clave que la Mac no recordará. Arregla el acceso al llavero y muestra un código nuevo."
           }
         }
       }
@@ -141,16 +361,6 @@
         }
       }
     },
-    "Unencrypted transport (Debug only)": {
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Transporte sin cifrar (solo Debug)"
-          }
-        }
-      }
-    },
     "Unmute": {
       "localizations": {
         "es": {
@@ -167,6 +377,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Esperando la red…"
+          }
+        }
+      }
+    },
+    "“%@” is now paired.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” quedó emparejado."
           }
         }
       }

@@ -24,6 +24,11 @@ struct NetworkIssueTests {
         #expect(NetworkIssue(NWError.dns(-65537)).kind == .unreachable)
     }
 
+    @Test func tlsErrorsAreHandshakeFailures() {
+        // errSSLPeerHandshakeFail: el servidor abortó el handshake (clave o identidad desconocida).
+        #expect(NetworkIssue(NWError.tls(-9824)).kind == .handshakeFailed)
+    }
+
     @Test func keepsTechnicalDetail() {
         #expect(!NetworkIssue(NWError.posix(.ECONNABORTED)).detail.isEmpty)
     }

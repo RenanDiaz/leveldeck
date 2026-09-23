@@ -1,12 +1,62 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Allow LevelDeck to use the camera in Settings to scan the pairing code.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permite que LevelDeck use la cámara en Ajustes para escanear el código de emparejamiento."
+          }
+        }
+      }
+    },
+    "Camera access is off": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El acceso a la cámara está desactivado"
+          }
+        }
+      }
+    },
+    "Camera viewfinder": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visor de la cámara"
+          }
+        }
+      }
+    },
     "Can't reach the Mac. Check that both devices are on the same Wi-Fi network and that Local Network access is allowed.": {
       "localizations": {
         "es": {
           "stringUnit": {
             "state": "translated",
             "value": "No se puede llegar a la Mac. Revisa que ambos estén en la misma red Wi-Fi y que el acceso a la red local esté permitido."
+          }
+        }
+      }
+    },
+    "Cancel": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelar"
+          }
+        }
+      }
+    },
+    "Connecting to “%@”…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conectando con “%@”…"
           }
         }
       }
@@ -21,12 +71,22 @@
         }
       }
     },
-    "Connection unavailable": {
+    "Couldn't access the Keychain. Pairings may not be saved.": {
       "localizations": {
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Conexión no disponible"
+            "value": "No se pudo acceder al llavero. Puede que los emparejamientos no se guarden."
+          }
+        }
+      }
+    },
+    "Couldn't connect to the Mac to finish pairing. Show a new code and try again.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo conectar con la Mac para terminar el emparejamiento. Muestra un código nuevo e inténtalo de nuevo."
           }
         }
       }
@@ -51,12 +111,62 @@
         }
       }
     },
+    "Couldn't find “%@” on the network. Make sure both devices are on the same Wi-Fi and try again.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se encontró “%@” en la red. Revisa que ambos estén en la misma red Wi-Fi e inténtalo de nuevo."
+          }
+        }
+      }
+    },
+    "Couldn't save the key in the Keychain.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo guardar la clave en el llavero."
+          }
+        }
+      }
+    },
     "Disconnected": {
       "localizations": {
         "es": {
           "stringUnit": {
             "state": "translated",
             "value": "Desconectado"
+          }
+        }
+      }
+    },
+    "Done": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listo"
+          }
+        }
+      }
+    },
+    "Forget": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Olvidar"
+          }
+        }
+      }
+    },
+    "Forgetting a Mac removes its key from this iPhone. The Mac still lists this iPhone until you revoke it from its menu.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Olvidar una Mac borra su clave de este iPhone. La Mac sigue listando este iPhone hasta que lo revoques desde su menú."
           }
         }
       }
@@ -141,6 +251,16 @@
         }
       }
     },
+    "No camera available": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No hay cámara disponible"
+          }
+        }
+      }
+    },
     "No device": {
       "localizations": {
         "es": {
@@ -151,12 +271,52 @@
         }
       }
     },
+    "No paired Macs yet.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todavía no hay Macs emparejadas."
+          }
+        }
+      }
+    },
+    "OK": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        }
+      }
+    },
+    "On the Mac, choose “Pair New Device…” in the LevelDeck menu and point the camera at the code.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En la Mac, elige “Emparejar nuevo dispositivo…” en el menú de LevelDeck y apunta la cámara al código."
+          }
+        }
+      }
+    },
     "Open LevelDeck Agent on your Mac, on the same Wi-Fi network.": {
       "localizations": {
         "es": {
           "stringUnit": {
             "state": "translated",
             "value": "Abre LevelDeck Agent en tu Mac, en la misma red Wi-Fi."
+          }
+        }
+      }
+    },
+    "Open Settings": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir Ajustes"
           }
         }
       }
@@ -177,6 +337,86 @@
           "stringUnit": {
             "state": "translated",
             "value": "Volumen de salida"
+          }
+        }
+      }
+    },
+    "Pair": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Emparejar"
+          }
+        }
+      }
+    },
+    "Pair a Mac": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Emparejar una Mac"
+          }
+        }
+      }
+    },
+    "Paired": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Emparejada"
+          }
+        }
+      }
+    },
+    "Paired %@": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Emparejada el %@"
+          }
+        }
+      }
+    },
+    "Paired Macs": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Macs emparejadas"
+          }
+        }
+      }
+    },
+    "Paired with “%@”.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Emparejado con “%@”."
+          }
+        }
+      }
+    },
+    "Paste Code": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pegar código"
+          }
+        }
+      }
+    },
+    "Protocol": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Protocolo"
           }
         }
       }
@@ -211,6 +451,26 @@
         }
       }
     },
+    "Settings": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajustes"
+          }
+        }
+      }
+    },
+    "That code isn't a LevelDeck pairing code.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ese código no es un código de emparejamiento de LevelDeck."
+          }
+        }
+      }
+    },
     "The Mac didn't allow that change.": {
       "localizations": {
         "es": {
@@ -221,12 +481,32 @@
         }
       }
     },
+    "The Mac didn't recognize this iPhone's key. Pair it again from the Mac's menu.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La Mac no reconoció la clave de este iPhone. Vuelve a emparejarlo desde el menú de la Mac."
+          }
+        }
+      }
+    },
     "The Mac has no default device for that channel.": {
       "localizations": {
         "es": {
           "stringUnit": {
             "state": "translated",
             "value": "La Mac no tiene dispositivo por defecto para ese canal."
+          }
+        }
+      }
+    },
+    "The Mac registers this iPhone on the first connection.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La Mac registra este iPhone en la primera conexión."
           }
         }
       }
@@ -251,6 +531,16 @@
         }
       }
     },
+    "The code comes from a newer LevelDeck Agent. Update this app.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El código viene de un LevelDeck Agent más nuevo. Actualiza esta app."
+          }
+        }
+      }
+    },
     "The connection to the Mac was lost.": {
       "localizations": {
         "es": {
@@ -261,12 +551,12 @@
         }
       }
     },
-    "This build doesn't include secure transport yet (phase 3). Protocol v%lld.": {
+    "This device can't scan the pairing code.": {
       "localizations": {
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Este build todavía no incluye transporte seguro (Fase 3). Protocolo v%lld."
+            "value": "Este dispositivo no puede escanear el código de emparejamiento."
           }
         }
       }
@@ -281,12 +571,42 @@
         }
       }
     },
+    "This iPhone is no longer paired": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este iPhone ya no está emparejado"
+          }
+        }
+      }
+    },
+    "This iPhone is no longer paired with the Mac.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este iPhone ya no está emparejado con la Mac."
+          }
+        }
+      }
+    },
     "This version of LevelDeck isn't compatible with the agent on the Mac. Update both.": {
       "localizations": {
         "es": {
           "stringUnit": {
             "state": "translated",
             "value": "Esta versión de LevelDeck no es compatible con el agente de la Mac. Actualiza ambos."
+          }
+        }
+      }
+    },
+    "Try Again": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reintentar"
           }
         }
       }
@@ -311,12 +631,42 @@
         }
       }
     },
+    "Version": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Versión"
+          }
+        }
+      }
+    },
     "Waiting for the local network": {
       "localizations": {
         "es": {
           "stringUnit": {
             "state": "translated",
             "value": "Esperando la red local"
+          }
+        }
+      }
+    },
+    "“%@” didn't accept the pairing. The code may have expired: show a new one on the Mac.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” no aceptó el emparejamiento. Puede que el código haya vencido: muestra uno nuevo en la Mac."
+          }
+        }
+      }
+    },
+    "“%@” revoked this iPhone. To control it again, pair it from the Mac's menu.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” revocó este iPhone. Para volver a controlarla, empareja desde el menú de la Mac."
           }
         }
       }
