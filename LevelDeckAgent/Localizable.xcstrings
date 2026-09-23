@@ -81,6 +81,16 @@
         }
       }
     },
+    "Couldn't save the pairing in the Keychain.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo guardar el emparejamiento en el llavero."
+          }
+        }
+      }
+    },
     "Done": {
       "localizations": {
         "es": {
@@ -317,6 +327,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "El código venció."
+          }
+        }
+      }
+    },
+    "The iPhone was refused so it doesn't keep a key the Mac won't remember. Fix Keychain access and show a new code.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se rechazó al iPhone para que no se quede con una clave que la Mac no recordará. Arregla el acceso al llavero y muestra un código nuevo."
           }
         }
       }

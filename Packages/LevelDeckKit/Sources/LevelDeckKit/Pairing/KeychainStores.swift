@@ -3,13 +3,21 @@ import Security
 
 /// Ítems `kSecClassGenericPassword` de un servicio, uno por cuenta, con el valor en JSON.
 ///
-/// Usa el Keychain de protección de datos (`kSecUseDataProtectionKeychain`) en ambas
-/// plataformas: en macOS evita los diálogos del llavero de login al re-firmar el binario en
-/// cada build, a cambio de exigir que la app esté firmada con un equipo de desarrollo. Los
-/// ítems no migran a otro dispositivo (`ThisDeviceOnly`): la identidad es por dispositivo.
+/// - iOS: Keychain de protección de datos, con `ThisDeviceOnly` (la identidad es por
+///   dispositivo y no migra con un respaldo).
+/// - macOS: llavero de login clásico. El de protección de datos exige el entitlement
+///   `keychain-access-groups` con perfil de aprovisionamiento, que un Personal Team no da
+///   (`SecItemUpdate` falla con `errSecMissingEntitlement`). El llavero de login solo pide
+///   confirmación si cambia la identidad de firma del agente; con el mismo equipo no molesta.
 @MainActor
 final class KeychainRecords<Record: Codable> {
     private let service: String
+
+    #if os(macOS)
+    private static let usesDataProtectionKeychain = false
+    #else
+    private static let usesDataProtectionKeychain = true
+    #endif
 
     init(service: String) {
         self.service = service
@@ -47,7 +55,9 @@ final class KeychainRecords<Record: Codable> {
         if status == errSecItemNotFound {
             var attributes = query
             attributes[kSecValueData as String] = data
-            attributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            if Self.usesDataProtectionKeychain {
+                attributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            }
             try check(SecItemAdd(attributes as CFDictionary, nil), "SecItemAdd")
             return
         }
@@ -63,11 +73,14 @@ final class KeychainRecords<Record: Codable> {
     }
 
     private func baseQuery() -> [String: Any] {
-        [
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecUseDataProtectionKeychain as String: true,
         ]
+        if Self.usesDataProtectionKeychain {
+            query[kSecUseDataProtectionKeychain as String] = true
+        }
+        return query
     }
 
     private func check(_ status: OSStatus, _ operation: String) throws {

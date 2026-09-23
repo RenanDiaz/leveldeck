@@ -19,11 +19,10 @@ struct PairingWindowView: View {
                 paired(device)
             } else if let pending = pairing.pending {
                 code(pending)
+            } else if let error = pairing.storeError {
+                failed(error)
             } else {
                 expired
-            }
-            if let error = pairing.storeError {
-                KeychainErrorView(error: error)
             }
         }
         .padding(24)
@@ -82,6 +81,40 @@ struct PairingWindowView: View {
                 dismiss()
             }
             .keyboardShortcut(.defaultAction)
+        }
+    }
+
+    /// El iPhone pasó el handshake pero la Mac no pudo guardar la clave: no se empareja.
+    private func failed(_ error: PairingStoreError) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: "key.slash")
+                .font(.system(size: 48))
+                .foregroundStyle(.orange)
+                .accessibilityHidden(true)
+            Text("Couldn't save the pairing in the Keychain.")
+                .font(.headline)
+                .multilineTextAlignment(.center)
+            Text("The iPhone was refused so it doesn't keep a key the Mac won't remember. Fix Keychain access and show a new code.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            #if DEBUG
+            Text(verbatim: error.detail)
+                .font(.caption2.monospaced())
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+                .textSelection(.enabled)
+            #endif
+            HStack {
+                Button("Close") {
+                    dismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+                Button("Show a New Code") {
+                    pairing.beginPairing(agentName: remote.displayName)
+                }
+                .keyboardShortcut(.defaultAction)
+            }
         }
     }
 
