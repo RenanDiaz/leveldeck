@@ -1,0 +1,64 @@
+name: LevelDeck
+
+options:
+  bundleIdPrefix: com.renandiaz
+  deploymentTarget:
+    macOS: "14.0"
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+configFiles:
+  Debug: Configs/Base.xcconfig
+  Release: Configs/Base.xcconfig
+
+packages:
+  LevelDeckKit:
+    path: Packages/LevelDeckKit
+
+settingGroups:
+  swift:
+    base:
+      SWIFT_VERSION: "6.0"
+      SWIFT_STRICT_CONCURRENCY: complete
+      GENERATE_INFOPLIST_FILE: YES
+
+targets:
+  LevelDeckAgent:
+    type: application
+    platform: macOS
+    sources: [LevelDeckAgent]
+    dependencies:
+      - package: LevelDeckKit
+    settings:
+      groups: [swift]
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.renandiaz.LevelDeckAgent
+        INFOPLIST_KEY_CFBundleDisplayName: LevelDeck Agent
+        # Solo barra de menú, sin ícono en el Dock (SPEC §5.1).
+        INFOPLIST_KEY_LSUIElement: YES
+
+  LevelDeck:
+    type: application
+    platform: iOS
+    sources: [LevelDeck]
+    dependencies:
+      - package: LevelDeckKit
+    settings:
+      groups: [swift]
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.renandiaz.LevelDeck
+        INFOPLIST_KEY_CFBundleDisplayName: LevelDeck
+        TARGETED_DEVICE_FAMILY: "1"
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+
+schemes:
+  LevelDeckAgent:
+    build:
+      targets:
+        LevelDeckAgent: all
+  LevelDeck:
+    build:
+      targets:
+        LevelDeck: all

@@ -1,0 +1,10 @@
+// Ajustes compartidos por ambos targets. Se aplica a nivel de proyecto desde project.yml.
+
+MARKETING_VERSION = 0.1.0
+CURRENT_PROJECT_VERSION = 1
+
+CODE_SIGN_STYLE = Automatic
+
+// Opcional y fuera de git: DEVELOPMENT_TEAM y otros ajustes personales.
+// Copia Local.xcconfig.example a Local.xcconfig.
+#include? "Local.xcconfig"
