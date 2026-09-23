@@ -9,15 +9,15 @@ import Security
 ///   `keychain-access-groups` con perfil de aprovisionamiento, que un Personal Team no da
 ///   (`SecItemUpdate` falla con `errSecMissingEntitlement`). El llavero de login solo pide
 ///   confirmación si cambia la identidad de firma del agente; con el mismo equipo no molesta.
+#if os(macOS)
+private let usesDataProtectionKeychain = false
+#else
+private let usesDataProtectionKeychain = true
+#endif
+
 @MainActor
 final class KeychainRecords<Record: Codable> {
     private let service: String
-
-    #if os(macOS)
-    private static let usesDataProtectionKeychain = false
-    #else
-    private static let usesDataProtectionKeychain = true
-    #endif
 
     init(service: String) {
         self.service = service
@@ -55,7 +55,7 @@ final class KeychainRecords<Record: Codable> {
         if status == errSecItemNotFound {
             var attributes = query
             attributes[kSecValueData as String] = data
-            if Self.usesDataProtectionKeychain {
+            if usesDataProtectionKeychain {
                 attributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
             }
             try check(SecItemAdd(attributes as CFDictionary, nil), "SecItemAdd")
@@ -77,7 +77,7 @@ final class KeychainRecords<Record: Codable> {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
         ]
-        if Self.usesDataProtectionKeychain {
+        if usesDataProtectionKeychain {
             query[kSecUseDataProtectionKeychain as String] = true
         }
         return query
