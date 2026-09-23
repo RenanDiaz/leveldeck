@@ -70,6 +70,13 @@ extension NWProtocolTLS.Options {
         }
         sec_protocol_options_set_min_tls_protocol_version(security, .TLSv12)
         sec_protocol_options_set_max_tls_protocol_version(security, .TLSv12)
+        // Sin reanudación de sesión ni tickets: cada conexión hace el handshake PSK completo.
+        // Con reanudación, un cliente del mismo proceso que ya tuvo una sesión válida con ese
+        // host:puerto la reanuda sin volver a probar la clave (lo detectaron los tests de
+        // rechazo en loopback), y un dispositivo revocado podría seguir entrando mientras su
+        // ticket viva. La seguridad no debe depender de que el puerto cambie.
+        sec_protocol_options_set_tls_resumption_enabled(security, false)
+        sec_protocol_options_set_tls_tickets_enabled(security, false)
         return options
     }
 
