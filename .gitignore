@@ -16,3 +16,6 @@ Package.resolved
 Configs/Local.xcconfig
 
 .DS_Store
+
+# Salida de scripts/verify.sh
+build/

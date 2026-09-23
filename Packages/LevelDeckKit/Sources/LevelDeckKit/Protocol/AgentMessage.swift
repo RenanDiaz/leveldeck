@@ -17,9 +17,10 @@ extension AgentMessage: Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         switch try container.decode(MessageType.self, forKey: .type) {
         case .state:
+            // `null` = sin dispositivo; la clave ausente sigue siendo un error de decodificación.
             let snapshot = StateSnapshot(
-                output: try container.decode(ChannelState.self, forKey: .output),
-                input: try container.decode(ChannelState.self, forKey: .input),
+                output: try container.decode(ChannelState?.self, forKey: .output),
+                input: try container.decode(ChannelState?.self, forKey: .input),
                 devices: try container.decode(DeviceList.self, forKey: .devices)
             )
             self = .state(snapshot, version: try container.decode(Int.self, forKey: .v))
@@ -38,13 +39,25 @@ extension AgentMessage: Codable {
             // Payload plano: los campos del snapshot van al mismo nivel que `type`.
             try container.encode(MessageType.state, forKey: .type)
             try container.encode(version, forKey: .v)
-            try container.encode(snapshot.output, forKey: .output)
-            try container.encode(snapshot.input, forKey: .input)
+            try encodeChannel(snapshot.output, forKey: .output, in: &container)
+            try encodeChannel(snapshot.input, forKey: .input, in: &container)
             try container.encode(snapshot.devices, forKey: .devices)
         case let .error(code, message):
             try container.encode(MessageType.error, forKey: .type)
             try container.encode(code, forKey: .code)
             try container.encode(message, forKey: .message)
+        }
+    }
+
+    /// Canal ausente = clave presente con `null`, nunca omitida (SPEC §8).
+    private func encodeChannel(
+        _ channel: ChannelState?, forKey key: CodingKeys,
+        in container: inout KeyedEncodingContainer<CodingKeys>
+    ) throws {
+        if let channel {
+            try container.encode(channel, forKey: key)
+        } else {
+            try container.encodeNil(forKey: key)
         }
     }
 }

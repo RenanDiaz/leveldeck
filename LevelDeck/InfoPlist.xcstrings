@@ -1,0 +1,16 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "NSLocalNetworkUsageDescription": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LevelDeck usa la red local para encontrar tu Mac y controlar su volumen."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

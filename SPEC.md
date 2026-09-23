@@ -1,7 +1,7 @@
 # SPEC — LevelDeck
 
 > Deriva de `INTENT.md`. Si algo aquí contradice el intent, manda el intent.
-> Estado: borrador v1.2 (entrada con la misma prioridad que la salida desde la Fase 1)
+> Estado: borrador v1.4 (Fase 2 con salida y entrada, mute, `muteSettable`, throttle, supresión de eco y localización en/es)
 
 ## 1. Resumen
 
@@ -26,6 +26,10 @@ Sin servidores externos, sin cuentas y sin dependencias de terceros.
 - macOS 14+ e iOS 17+ (permite usar el framework Observation y APIs modernas de SwiftUI).
 - Swift 5.10+ o Swift 6 con concurrencia estricta.
 - Sin dependencias externas: solo CoreAudio, Network, Security, SwiftUI, AVFoundation (cámara para el QR) y ServiceManagement.
+- Idiomas: inglés (idioma de desarrollo y de respaldo) y español, en ambas apps, con String Catalogs (`Localizable.xcstrings` e `InfoPlist.xcstrings` por target). Reglas:
+  - `LevelDeckKit` no genera textos de interfaz. Expone problemas tipados (`NetworkIssue` para la red, `ErrorCode` del protocolo) y cada app arma su mensaje localizado.
+  - Nunca se muestra el `localizedDescription` de un error del sistema (mezcla una frase localizada con detalle técnico en inglés) ni el `message` de un `error` del protocolo. El detalle técnico solo aparece en builds Debug, sin traducir y marcado como tal.
+  - `scripts/check-localizations.py` (parte de `verify.sh`) falla si un texto que el compilador extrae de las apps no tiene traducción al español, o si los bundles no incluyen `es.lproj`.
 
 ## 4. Estructura del repositorio
 
@@ -41,6 +45,7 @@ leveldeck/
     ├── LevelDeckKit/     # Swift Package compartido
     │   ├── Protocol/  # modelos de mensajes (Codable), versión del protocolo
     │   ├── Transport/ # wrappers de Network.framework, framing, TLS-PSK
+    │   ├── Sync/      # throttle de envíos, supresión de eco del fader, medición de RTT
     │   └── Pairing/   # formato del QR, almacenamiento en Keychain
     └── LevelDeckAgentKit/  # Swift Package solo macOS, usado por el agente
         ├── AgentAudio/     # AudioControlling y AudioModel (lógica de estado, sin CoreAudio)
@@ -77,8 +82,8 @@ Reglas:
 - El volumen se expresa como `Float` normalizado en el rango 0.0–1.0.
 - Salida y entrada son simétricas: toda la API de `AudioControlling` se parametriza por `Scope`.
 - Antes de exponer un control, verificar con `AudioObjectIsPropertySettable`. Algunos dispositivos (HDMI, ciertas interfaces USB) no permiten cambiar el volumen. En ese caso el control se reporta como `settable: false` y el cliente lo muestra deshabilitado.
-- La configurabilidad del volumen y del mute se evalúa por separado (hay micrófonos con volumen y sin mute, y al revés). Internamente el agente lleva `volumeSettable` y `muteSettable`; el protocolo solo expone `settable` (volumen) hasta la Fase 4, que agrega `muteSettable`.
-- Puede no haber dispositivo por defecto para un scope (p. ej. un Mac mini sin micrófono). El agente lo modela como canal ausente y el menú muestra "Sin dispositivo". Cómo se representa en el protocolo se decide en la Fase 2.
+- La configurabilidad del volumen y del mute se evalúa por separado (hay micrófonos con volumen y sin mute, y al revés). Internamente el agente lleva `volumeSettable` y `muteSettable`; el protocolo los expone como `settable` (volumen) y `muteSettable` desde la Fase 2.
+- Puede no haber dispositivo por defecto para un scope (p. ej. un Mac mini sin micrófono). El agente lo modela como canal ausente y el menú muestra "Sin dispositivo". En el protocolo, el canal va presente con valor `null` (ver §8).
 - Al cambiar el dispositivo por defecto, re-suscribir los listeners al nuevo dispositivo.
 - Cualquier cambio, venga del cliente o de fuera, produce un único evento de estado que se envía a todos los clientes conectados.
 
@@ -88,6 +93,14 @@ Reglas:
 - Transporte: TCP + TLS 1.3 con pre-shared key (PSK) y WebSocket encima (`NWProtocolWebSocket`) para tener framing de mensajes gratis.
 - Una conexión sin PSK válida no pasa el handshake. No hay canal sin cifrar, salvo durante el emparejamiento (§7).
 - Soporta varios clientes simultáneos.
+- El transporte (parámetros de Network.framework, framing, servidor, cliente y browser) vive en `LevelDeckKit`. Las apps solo eligen un valor de `TransportSecurity`, en un único archivo por app (`AgentTransport`, `AppTransport`); la Fase 3 agrega `tlsPSK` sin tocar el resto.
+
+**Transporte en claro (solo desarrollo, Fase 2).** `TransportSecurity.insecurePlaintext` (TCP + WebSocket sin cifrar) existe únicamente si está definido el flag de compilación `LEVELDECK_INSECURE_TRANSPORT`:
+
+- `LevelDeckKit` lo define con `.when(configuration: .debug)` y las apps con `SWIFT_ACTIVE_COMPILATION_CONDITIONS` solo en Debug (`project.yml`). En Release el caso no se compila y ninguna app puede construir un transporte en claro.
+- Si el flag aparece en un build sin `DEBUG`, un `#error` corta la compilación.
+- En Release, sin transporte, el agente no abre el servicio y el cliente muestra "Conexión no disponible" hasta la Fase 3.
+- `scripts/verify.sh` compila Debug y Release y comprueba que la marca del transporte en claro está en los binarios Debug (control positivo) y no aparece en los Release.
 
 ## 6. Cliente iOS
 
@@ -99,8 +112,10 @@ Reglas:
 
 ### 6.2 Comportamiento del fader
 
-- Mientras el usuario arrastra, el cliente es la fuente de verdad: los eventos de estado entrantes para ese control se ignoran hasta ~300 ms después de soltar. Esto evita saltos.
-- Los envíos se limitan a un máximo de 30 por segundo y siempre se envía el valor final al soltar.
+Las dos primeras reglas se implementan desde la Fase 2 (`SendThrottle`, `EchoGate` y `MixerState` en `LevelDeckKit/Sync`).
+
+- Mientras el usuario arrastra, el cliente es la fuente de verdad: los eventos de estado entrantes para ese control se ignoran hasta ~300 ms después de soltar. Esto evita saltos. Solo se retiene el volumen de ese fader: el resto del `state` (mute, nombre, configurabilidad, el otro canal) se aplica igual. Al vencer la ventana se aplica el último volumen recibido durante ella, para no quedar desincronizado. Si cambia el dispositivo por defecto a mitad del arrastre, manda el agente.
+- Los envíos se limitan a un máximo de 30 por segundo y siempre se envía el valor final al soltar. El primer valor sale de inmediato; los intermedios se agrupan y sale el más reciente.
 - Feedback háptico ligero en 0 %, en 100 % y al activar o desactivar el mute.
 - Si la conexión se pierde, los faders se muestran deshabilitados con un indicador de "Reconectando…" y el cliente reintenta con backoff (1 s, 2 s, 4 s, con máximo de 10 s).
 
@@ -130,7 +145,7 @@ Mensajes JSON sobre WebSocket. Todos incluyen `type` y el payload va plano, al m
 
 | type | payload | Efecto |
 |---|---|---|
-| `hello` | `{ v, deviceName }` | Primer mensaje. El agente responde con `state`. |
+| `hello` | `{ v, deviceName }` | Primer mensaje. El agente responde con `state`, o con `error` `unsupportedVersion` y cierra si `v` no coincide. Cualquier otro mensaje antes de `hello` cierra la conexión. |
 | `setVolume` | `{ scope: "output"\|"input", value: 0.0–1.0 }` | Cambia el volumen del dispositivo por defecto. |
 | `setMute` | `{ scope, muted: Bool }` | Cambia el mute. |
 | `setDefaultDevice` | `{ scope, deviceId: String }` | Cambia el dispositivo por defecto. |
@@ -140,16 +155,16 @@ Mensajes JSON sobre WebSocket. Todos incluyen `type` y el payload va plano, al m
 | type | payload |
 |---|---|
 | `state` | Snapshot completo (ver abajo). Se envía tras `hello` y ante cualquier cambio. |
-| `error` | `{ code, message }`. Códigos: `unsupportedVersion`, `notSettable`, `deviceNotFound`, `invalidValue`. |
+| `error` | `{ code, message }`. Códigos: `unsupportedVersion`, `notSettable`, `deviceNotFound`, `invalidValue`. `message` es solo para diagnóstico y no se localiza; el cliente muestra un texto localizado según `code`. |
 
 ```json
 {
   "type": "state",
   "v": 1,
   "output": { "deviceId": "…", "deviceName": "MacBook Pro Speakers",
-              "volume": 0.62, "muted": false, "settable": true },
+              "volume": 0.62, "muted": false, "settable": true, "muteSettable": true },
   "input":  { "deviceId": "…", "deviceName": "MacBook Pro Microphone",
-              "volume": 0.80, "muted": false, "settable": true },
+              "volume": 0.80, "muted": false, "settable": true, "muteSettable": true },
   "devices": {
     "output": [{ "id": "…", "name": "…" }],
     "input":  [{ "id": "…", "name": "…" }]
@@ -157,11 +172,17 @@ Mensajes JSON sobre WebSocket. Todos incluyen `type` y el payload va plano, al m
 }
 ```
 
+`settable` indica si se puede cambiar el volumen y `muteSettable` si se puede cambiar el mute; el cliente deshabilita cada control por separado.
+
+Si no hay dispositivo por defecto para un scope, su clave va presente con valor `null` (`"input": null`). Omitir la clave es un error de decodificación, igual que cualquier otro campo faltante. Hasta la Fase 4, `devices` viaja con listas vacías.
+
 El `deviceId` es el UID del dispositivo (`kAudioDevicePropertyDeviceUID`), no el `AudioObjectID`, porque el UID es estable entre reinicios.
 
-Un `setVolume` con `value` fuera de 0.0–1.0 (o `NaN`) es inválido: no se recorta. `LevelDeckKit` se niega a codificarlo y lo rechaza al decodificar, y el agente responde `error` con `invalidValue`. Un `type` desconocido o un campo faltante también son errores de decodificación.
+Un `setVolume` con `value` fuera de 0.0–1.0 (o `NaN`) es inválido: no se recorta. `LevelDeckKit` se niega a codificarlo y lo rechaza al decodificar, y el agente responde `error` con `invalidValue`. Un `type` desconocido o un campo faltante también son errores de decodificación y también se responden con `invalidValue`; la conexión sigue abierta.
 
-Se envía siempre el snapshot completo, no diffs. El payload es pequeño y así se evita todo un tipo de bugs de sincronización. Durante un arrastre, los envíos de `state` se agrupan (coalescing) a un máximo de 30 por segundo.
+Hasta la Fase 4, `setDefaultDevice` se responde con `notSettable`.
+
+Se envía siempre el snapshot completo, no diffs. El payload es pequeño y así se evita todo un tipo de bugs de sincronización. Los envíos de `state` se agrupan (coalescing) a un máximo de 30 por segundo, siempre con el último estado, y no se reenvía un snapshot idéntico al anterior: así cada cambio produce un único evento aunque llegue por varias vías (el comando del cliente y el listener de CoreAudio).
 
 ## 9. Fases
 
@@ -178,16 +199,22 @@ Cada fase termina con algo que se puede usar y probar.
 - un dispositivo no configurable deshabilita su slider sin fallar;
 - la lógica de estado se prueba con un mock de `AudioControlling` y pasa en CI; la verificación con hardware real es un checklist manual en el PR.
 
-**Fase 2 — Conexión local (sin seguridad, solo en desarrollo).** `RemoteServer` con Bonjour y WebSocket en claro detrás de un flag de debug. El cliente iOS descubre, conecta y muestra los faders de salida y entrada sincronizados.
-*Listo cuando:* los cambios en cualquiera de los dos lados se reflejan en el otro en menos de 100 ms en la red local.
+**Fase 2 — Conexión local (sin seguridad, solo en desarrollo).** Servidor con Bonjour y WebSocket en claro, que solo existe en builds Debug (flag `LEVELDECK_INSECURE_TRANSPORT`, §5.3). El transporte y el protocolo viven en `LevelDeckKit`. El cliente iOS descubre, conecta y muestra los faders de salida y entrada, cada uno con mute, sincronizados en ambas direcciones. `muteSettable` entra al protocolo (se adelanta desde la Fase 4). Se adelantan desde la Fase 5 el throttle de envíos (máx. 30/s, siempre con el valor final) y la supresión de eco del fader (§6.2). Un overlay de debug en el iPhone muestra el RTT de `setVolume` → `state`.
+*Listo cuando:*
+- el agente anuncia `_leveldeck._tcp` y el iPhone lo descubre y conecta sin configurar IP;
+- los faders de salida y entrada con mute se sincronizan en ambas direcciones en menos de 100 ms en la red local (medido con el overlay de RTT);
+- arrastrar el fader no produce saltos ni tiembla por el eco;
+- un test de integración en `LevelDeckKit` levanta el servidor en loopback y verifica `hello` → `setVolume` → `state`, y pasa en CI;
+- el transporte en claro no se puede compilar en Release (verificado en CI);
+- verificación manual en iPhone físico (permiso de red local y Bonjour), con checklist en el PR.
 
-**Fase 3 — Emparejamiento y TLS-PSK.** QR, Keychain, TLS-PSK y revocación. Se elimina el modo en claro de los builds de release.
+**Fase 3 — Emparejamiento y TLS-PSK.** QR, Keychain, TLS-PSK y revocación. Se agrega `TransportSecurity.tlsPSK`; el modo en claro ya no existe en Release desde la Fase 2, y se decide si se conserva en Debug.
 *Listo cuando:* un iPhone sin emparejar no puede conectar, uno emparejado conecta automáticamente y uno revocado queda desconectado.
 
-**Fase 4 — Mixer completo.** Mute en el cliente iOS, selector de dispositivo, manejo de `settable: false` y `muteSettable` en el protocolo y el cliente, y varios clientes simultáneos.
+**Fase 4 — Mixer completo.** Selector de dispositivo (`devices` y `setDefaultDevice`), manejo completo de `settable: false` en el cliente y pruebas con varios clientes simultáneos. (El mute en el cliente y `muteSettable` se adelantaron a la Fase 2.)
 *Listo cuando:* los dos faders y el selector funcionan, y conectar un monitor HDMI sin control de volumen deshabilita el fader sin romper nada.
 
-**Fase 5 — Pulido.** Reconexión con backoff, supresión de eco durante el arrastre, hápticos, login item y opción de desactivarlo.
+**Fase 5 — Pulido.** Reconexión con backoff, hápticos, login item y opción de desactivarlo. (La supresión de eco y el throttle se adelantaron a la Fase 2.)
 *Listo cuando:* dormir y despertar la Mac, o apagar y encender el Wi-Fi del iPhone, recupera la conexión sin intervención.
 
 ## 10. Después de v1
@@ -200,7 +227,7 @@ Cada fase termina con algo que se puede usar y probar.
 
 - **LevelDeckKit:** tests unitarios de codificación del protocolo, formato del QR y lógica de throttle y coalescing.
 - **AudioController:** detrás de `AudioControlling`. Tests con mock para la lógica de estado y una verificación manual contra el hardware real (CoreAudio no se puede mockear de forma útil a bajo nivel).
-- **Integración:** test que levanta `RemoteServer` en loopback con una PSK de prueba y verifica el ciclo completo `hello` → `setVolume` → `state`.
+- **Integración:** test que levanta el servidor de `LevelDeckKit` en loopback y verifica el ciclo completo `hello` → `setVolume` → `state`, además de `setMute`, errores y varios clientes. En la Fase 2 usa el transporte en claro (solo existe en Debug, que es como corre `swift test`); la Fase 3 lo cambia por una PSK de prueba.
 - **Checklist manual por fase,** basado en los criterios de "Listo cuando".
 
 ## 12. Distribución

@@ -6,6 +6,8 @@ options:
     macOS: "14.0"
     iOS: "17.0"
   createIntermediateGroups: true
+  # Inglés es el idioma de desarrollo y el de respaldo; español va en los String Catalogs.
+  developmentLanguage: en
 
 configFiles:
   Debug: Configs/Base.xcconfig
@@ -24,6 +26,14 @@ settingGroups:
       SWIFT_STRICT_CONCURRENCY: complete
       GENERATE_INFOPLIST_FILE: YES
       ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+      LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+      # Extrae los textos localizables al compilar; check-localizations.py los usa en CI.
+      SWIFT_EMIT_LOC_STRINGS: YES
+    configs:
+      Debug:
+        # Transporte en claro de la Fase 2, solo en Debug (SPEC §5.3). Release no lo define y
+        # el código no existe; verify.sh comprueba que no aparezca en los binarios Release.
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) LEVELDECK_INSECURE_TRANSPORT"
 
 targets:
   LevelDeckAgent:
@@ -43,6 +53,9 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: LevelDeck Agent
         # Solo barra de menú, sin ícono en el Dock (SPEC §5.1).
         INFOPLIST_KEY_LSUIElement: YES
+        # macOS 15+ también pide permiso de red local (SPEC §6.3).
+        # Traducción al español en LevelDeckAgent/InfoPlist.xcstrings.
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: LevelDeck Agent uses the local network so your iPhone can control this Mac's volume.
 
   LevelDeck:
     type: application
@@ -55,6 +68,9 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.renandiaz.LevelDeck
         INFOPLIST_KEY_CFBundleDisplayName: LevelDeck
+        # NSBonjourServices y NSLocalNetworkUsageDescription (SPEC §6.3). Se combina con el
+        # Info.plist generado; NSBonjourServices es un array y no tiene clave INFOPLIST_KEY_.
+        INFOPLIST_FILE: LevelDeck/Info.plist
         TARGETED_DEVICE_FAMILY: "1"
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES

@@ -32,13 +32,49 @@ struct AgentMessageTests {
 
     @Test func settableFalseSurvivesRoundTrip() throws {
         var snapshot = Fixtures.snapshot
-        snapshot.output.settable = false
+        snapshot.output?.settable = false
         let data = try ProtocolCoder.encode(AgentMessage.state(snapshot))
         guard case let .state(decoded, _) = try ProtocolCoder.decode(AgentMessage.self, from: data) else {
             Issue.record("Se esperaba un mensaje state")
             return
         }
-        #expect(decoded.output.settable == false)
+        #expect(decoded.output?.settable == false)
+    }
+
+    @Test func muteSettableSurvivesRoundTrip() throws {
+        var snapshot = Fixtures.snapshot
+        snapshot.input?.muteSettable = false
+        let data = try ProtocolCoder.encode(AgentMessage.state(snapshot))
+        #expect(try ProtocolCoder.decode(AgentMessage.self, from: data) == .state(snapshot))
+    }
+
+    @Test func absentChannelIsEncodedAsNull() throws {
+        var snapshot = Fixtures.snapshot
+        snapshot.input = nil
+        let data = try ProtocolCoder.encode(AgentMessage.state(snapshot))
+        let object = try Fixtures.object(data)
+        #expect(object.keys.contains("input"))
+        #expect(object["input"] is NSNull)
+        #expect(try ProtocolCoder.decode(AgentMessage.self, from: data) == .state(snapshot))
+    }
+
+    @Test func rejectsStateWithoutChannelKey() throws {
+        var object = try Fixtures.object(Fixtures.stateJSON)
+        object.removeValue(forKey: "input")
+        let data = try JSONSerialization.data(withJSONObject: object)
+        #expect(throws: DecodingError.self) {
+            try ProtocolCoder.decode(AgentMessage.self, from: data)
+        }
+    }
+
+    @Test func rejectsChannelWithoutMuteSettable() {
+        let json = Data("""
+        {"type":"state","v":1,"input":null,"devices":{"output":[],"input":[]},
+         "output":{"deviceId":"a","deviceName":"b","volume":0.5,"muted":false,"settable":true}}
+        """.utf8)
+        #expect(throws: DecodingError.self) {
+            try ProtocolCoder.decode(AgentMessage.self, from: json)
+        }
     }
 
     @Test func rejectsUnknownErrorCode() {
