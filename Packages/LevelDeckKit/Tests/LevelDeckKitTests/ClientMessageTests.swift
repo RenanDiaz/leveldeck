@@ -6,6 +6,7 @@ import Testing
 struct ClientMessageTests {
     static let allMessages: [ClientMessage] = [
         .hello(deviceName: "iPhone de Renan"),
+        .hello(deviceName: "iPhone", deviceId: "8E0B2C1A-0000-4000-8000-000000000001"),
         .setVolume(scope: .output, value: 0.5),
         .setVolume(scope: .input, value: 0),
         .setVolume(scope: .output, value: 1),
@@ -25,6 +26,19 @@ struct ClientMessageTests {
         #expect(object["type"] as? String == "hello")
         #expect(object["v"] as? Int == ProtocolVersion.current)
         #expect(object["deviceName"] as? String == "iPhone")
+    }
+
+    @Test func helloOmitsDeviceIdWhenAbsent() throws {
+        let object = try Fixtures.object(ProtocolCoder.encode(ClientMessage.hello(deviceName: "iPhone")))
+        #expect(object["deviceId"] == nil)
+        let paired = try Fixtures.object(ProtocolCoder.encode(ClientMessage.hello(deviceName: "iPhone", deviceId: "dev-1")))
+        #expect(paired["deviceId"] as? String == "dev-1")
+    }
+
+    @Test func decodesHelloWithoutDeviceId() throws {
+        // Un `hello` de la Fase 2 (sin deviceId) sigue siendo válido; el authorizer decide.
+        let json = Data(#"{"type":"hello","v":1,"deviceName":"iPhone"}"#.utf8)
+        #expect(try ProtocolCoder.decode(ClientMessage.self, from: json) == .hello(deviceName: "iPhone", deviceId: nil))
     }
 
     @Test func commandsHaveFlatPayloadWithoutVersion() throws {

@@ -63,22 +63,6 @@ private struct StatusBanner: View {
     }
 }
 
-/// Detalle técnico sin localizar (código de error del sistema). Solo en builds Debug.
-private struct TechnicalDetail: View {
-    let issue: NetworkIssue
-
-    var body: some View {
-        #if DEBUG
-        Text(verbatim: issue.detail)
-            .font(.caption2.monospaced())
-            .foregroundStyle(.tertiary)
-            .multilineTextAlignment(.center)
-        #else
-        EmptyView()
-        #endif
-    }
-}
-
 private struct ChannelStrip: View {
     let scope: Scope
     let model: MixerModel

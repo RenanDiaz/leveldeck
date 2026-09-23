@@ -17,6 +17,9 @@ public struct NetworkIssue: Equatable, Sendable {
         case unreachable
         /// No se pudo obtener la dirección del servicio Bonjour.
         case unresolved
+        /// El handshake TLS falló: la Mac no reconoce la identidad o la clave de este
+        /// dispositivo (no está emparejado o se revocó).
+        case handshakeFailed
         case other
     }
 
@@ -55,6 +58,8 @@ public struct NetworkIssue: Equatable, Sendable {
             }
         case let .dns(code):
             kind = Int32(code) == Self.dnsPolicyDenied ? .localNetworkDenied : .unreachable
+        case .tls:
+            kind = .handshakeFailed
         default:
             kind = .other
         }

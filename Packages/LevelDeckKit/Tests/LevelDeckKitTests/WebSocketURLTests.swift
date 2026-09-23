@@ -21,6 +21,11 @@ struct WebSocketURLTests {
         #expect(LevelDeckClient.webSocketURL(for: endpoint)?.absoluteString == "ws://[::1]:9000/")
     }
 
+    @Test func secureUsesWSS() {
+        let endpoint = NWEndpoint.hostPort(host: "127.0.0.1", port: 8080)
+        #expect(LevelDeckClient.webSocketURL(for: endpoint, secure: true)?.absoluteString == "wss://127.0.0.1:8080/")
+    }
+
     @Test func urlPassesThrough() throws {
         let url = try #require(URL(string: "ws://example.local:1/"))
         #expect(LevelDeckClient.webSocketURL(for: .url(url)) == url)

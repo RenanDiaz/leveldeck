@@ -9,6 +9,8 @@ public final class ServiceBrowser {
     public struct Agent: Identifiable, Hashable {
         public let name: String
         public let endpoint: NWEndpoint
+        /// `agentId` del registro TXT (SPEC §7). `nil` si el agente no lo anuncia.
+        public let agentID: String?
         public var id: String { name }
     }
 
@@ -71,7 +73,11 @@ public final class ServiceBrowser {
         var byName: [String: Agent] = [:]
         for result in results {
             guard case let .service(name, _, _, _) = result.endpoint, byName[name] == nil else { continue }
-            byName[name] = Agent(name: name, endpoint: result.endpoint)
+            var agentID: String?
+            if case let .bonjour(txt) = result.metadata {
+                agentID = txt.dictionary[LevelDeckService.txtAgentIDKey]
+            }
+            byName[name] = Agent(name: name, endpoint: result.endpoint, agentID: agentID)
         }
         agents = byName.values.sorted {
             $0.name.localizedStandardCompare($1.name) == .orderedAscending

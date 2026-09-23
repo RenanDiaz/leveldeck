@@ -86,4 +86,6 @@ public enum ErrorCode: String, Codable, Sendable, CaseIterable {
     case notSettable
     case deviceNotFound
     case invalidValue
+    /// El dispositivo no está emparejado (o se revocó): el agente cierra la sesión (SPEC §7).
+    case notPaired
 }

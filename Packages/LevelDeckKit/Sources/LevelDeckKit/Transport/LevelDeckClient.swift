@@ -29,6 +29,7 @@ public final class LevelDeckClient {
     private let endpoint: NWEndpoint
     private let security: TransportSecurity
     private let deviceName: String
+    private let deviceID: String?
     private let helloVersion: Int
     @ObservationIgnored private var connection: MessageConnection<AgentMessage, ClientMessage>?
     /// Conexión TCP corta que resuelve un endpoint Bonjour a host y puerto.
@@ -36,22 +37,29 @@ public final class LevelDeckClient {
     /// Identifica la conexión vigente para descartar eventos de una anterior ya cancelada.
     @ObservationIgnored private var connectionID: UUID?
 
-    public init(endpoint: NWEndpoint, security: TransportSecurity, deviceName: String) {
+    /// - Parameter deviceID: identidad PSK que la Mac asignó al emparejar; va en el `hello`
+    ///   (SPEC §7). `nil` solo con el transporte en claro de desarrollo.
+    public init(endpoint: NWEndpoint, security: TransportSecurity, deviceName: String, deviceID: String? = nil) {
         self.endpoint = endpoint
         self.security = security
         self.deviceName = deviceName
+        self.deviceID = deviceID
         self.helloVersion = ProtocolVersion.current
     }
 
     /// Solo para tests: permite anunciar otra versión en el `hello`.
-    init(endpoint: NWEndpoint, security: TransportSecurity, deviceName: String, helloVersion: Int) {
+    init(
+        endpoint: NWEndpoint, security: TransportSecurity, deviceName: String, deviceID: String?,
+        helloVersion: Int
+    ) {
         self.endpoint = endpoint
         self.security = security
         self.deviceName = deviceName
+        self.deviceID = deviceID
         self.helloVersion = helloVersion
     }
 
-    /// El WebSocket del cliente necesita un endpoint URL (`ws://host:port/`): con `hostPort` o
+    /// El WebSocket del cliente necesita un endpoint URL (`ws://host:port/`, `wss://` con TLS): con `hostPort` o
     /// con un servicio Bonjour aborta la conexión antes del upgrade (NWError 53). Un servicio se
     /// resuelve primero a host y puerto; un `hostPort` se convierte directamente.
     public func connect() {
@@ -93,7 +101,7 @@ public final class LevelDeckClient {
     }
 
     private func open(_ target: NWEndpoint, id: UUID) {
-        guard let url = Self.webSocketURL(for: target) else {
+        guard let url = Self.webSocketURL(for: target, secure: security.usesTLS) else {
             status = .disconnected(NetworkIssue(.other, detail: "Endpoint sin URL de WebSocket: \(target)"))
             return
         }
@@ -145,8 +153,9 @@ public final class LevelDeckClient {
         }
     }
 
-    /// `ws://host:port/` para un endpoint `hostPort`; un endpoint URL se usa tal cual.
-    static func webSocketURL(for endpoint: NWEndpoint) -> URL? {
+    /// `ws://host:port/` (o `wss://` si `secure`) para un endpoint `hostPort`; un endpoint URL
+    /// se usa tal cual.
+    static func webSocketURL(for endpoint: NWEndpoint, secure: Bool = false) -> URL? {
         switch endpoint {
         case let .url(url):
             return url
@@ -163,7 +172,7 @@ public final class LevelDeckClient {
             @unknown default:
                 return nil
             }
-            return URL(string: "ws://\(hostText):\(port.rawValue)/")
+            return URL(string: "\(secure ? "wss" : "ws")://\(hostText):\(port.rawValue)/")
         default:
             return nil
         }
@@ -173,7 +182,7 @@ public final class LevelDeckClient {
         guard id == connectionID else { return }
         switch event {
         case .ready:
-            connection?.send(.hello(deviceName: deviceName, version: helloVersion))
+            connection?.send(.hello(deviceName: deviceName, version: helloVersion, deviceId: deviceID))
         case let .waiting(issue):
             status = .waiting(issue)
         case let .closed(issue):

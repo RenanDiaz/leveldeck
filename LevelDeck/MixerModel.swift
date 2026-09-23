@@ -15,6 +15,9 @@ final class MixerModel {
     /// RTT de `setVolume` → `state` para el overlay de debug.
     private(set) var roundTrip = RoundTripMeter()
 
+    /// La Mac revocó este iPhone (`error` `notPaired`, SPEC §7): la clave ya no sirve.
+    @ObservationIgnored var onUnpaired: (@MainActor () -> Void)?
+
     @ObservationIgnored private var senders: [Scope: ThrottledSender<Float>] = [:]
     @ObservationIgnored private var settleTasks: [Scope: Task<Void, Never>] = [:]
 
@@ -98,6 +101,8 @@ final class MixerModel {
                 }
             }
             mixer.apply(snapshot, now: now)
+        case .error(.notPaired, _):
+            onUnpaired?()
         case .error:
             // El comando no se aplicó: volver a lo último que dijo el agente.
             mixer.resync(now: now)

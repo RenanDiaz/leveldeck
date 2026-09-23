@@ -29,11 +29,6 @@ settingGroups:
       LOCALIZATION_PREFERS_STRING_CATALOGS: YES
       # Extrae los textos localizables al compilar; check-localizations.py los usa en CI.
       SWIFT_EMIT_LOC_STRINGS: YES
-    configs:
-      Debug:
-        # Transporte en claro de la Fase 2, solo en Debug (SPEC §5.3). Release no lo define y
-        # el código no existe; verify.sh comprueba que no aparezca en los binarios Release.
-        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) LEVELDECK_INSECURE_TRANSPORT"
 
 targets:
   LevelDeckAgent:
@@ -68,8 +63,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.renandiaz.LevelDeck
         INFOPLIST_KEY_CFBundleDisplayName: LevelDeck
-        # NSBonjourServices y NSLocalNetworkUsageDescription (SPEC §6.3). Se combina con el
-        # Info.plist generado; NSBonjourServices es un array y no tiene clave INFOPLIST_KEY_.
+        # NSBonjourServices, NSLocalNetworkUsageDescription y NSCameraUsageDescription (SPEC §6.3).
+        # Se combina con el Info.plist generado; NSBonjourServices es un array y no tiene clave INFOPLIST_KEY_.
         INFOPLIST_FILE: LevelDeck/Info.plist
         TARGETED_DEVICE_FAMILY: "1"
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
