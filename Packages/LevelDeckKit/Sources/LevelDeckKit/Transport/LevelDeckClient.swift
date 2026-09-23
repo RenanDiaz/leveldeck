@@ -133,12 +133,13 @@ public final class LevelDeckClient {
                 status = .disconnected(NetworkIssue(.unresolved, detail: "Sin remoteEndpoint tras resolver"))
             }
         case let .waiting(error):
-            status = .waiting(NetworkIssue(error))
+            status = .waiting(NetworkIssue(error, path: resolver.currentPath))
         case let .failed(error):
+            let issue = NetworkIssue(error, path: resolver.currentPath)
             resolver.cancel()
             self.resolver = nil
             connectionID = nil
-            status = .disconnected(NetworkIssue(error))
+            status = .disconnected(issue)
         default:
             break
         }
@@ -173,12 +174,12 @@ public final class LevelDeckClient {
         switch event {
         case .ready:
             connection?.send(.hello(deviceName: deviceName, version: helloVersion))
-        case let .waiting(error):
-            status = .waiting(NetworkIssue(error))
-        case let .closed(error):
+        case let .waiting(issue):
+            status = .waiting(issue)
+        case let .closed(issue):
             connection = nil
             connectionID = nil
-            status = .disconnected(error.map { NetworkIssue($0) })
+            status = .disconnected(issue)
         case .message(.failure):
             // Un mensaje del agente que no entendemos no rompe la sesión.
             break

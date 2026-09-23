@@ -234,8 +234,8 @@ public final class LevelDeckServer {
         let text: String
         switch event {
         case .ready: text = "ready"
-        case let .waiting(error): text = "waiting(\(error))"
-        case let .closed(error): text = "closed(\(error.map { "\($0)" } ?? "nil"))"
+        case let .waiting(issue): text = "waiting(\(issue.kind): \(issue.detail))"
+        case let .closed(issue): text = "closed(\(issue.map { "\($0.kind): \($0.detail)" } ?? "nil"))"
         case .message: return
         }
         connectionEvents.append(text)

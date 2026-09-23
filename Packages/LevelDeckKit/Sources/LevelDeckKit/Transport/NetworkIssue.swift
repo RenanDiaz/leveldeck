@@ -32,8 +32,15 @@ public struct NetworkIssue: Equatable, Sendable {
     /// `kDNSServiceErr_PolicyDenied`: el sistema negó el acceso a la red local.
     private static let dnsPolicyDenied: Int32 = -65570
 
-    public init(_ error: NWError) {
+    /// - Parameter path: ruta de la conexión al fallar. Si el sistema reporta la red local
+    ///   denegada, manda sobre el código de error: al quitar el permiso con la conexión
+    ///   abierta, iOS la aborta con el mismo `ECONNABORTED` que al suspender la app.
+    public init(_ error: NWError, path: NWPath? = nil) {
         detail = error.debugDescription
+        if path?.unsatisfiedReason == .localNetworkDenied {
+            kind = .localNetworkDenied
+            return
+        }
         switch error {
         case let .posix(code):
             switch code {

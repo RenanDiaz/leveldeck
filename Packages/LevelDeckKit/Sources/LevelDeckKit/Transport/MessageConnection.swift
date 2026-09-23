@@ -9,11 +9,11 @@ final class MessageConnection<Incoming: Decodable, Outgoing: Encodable> {
     enum Event {
         case ready
         /// La conexión no puede avanzar todavía (p. ej. sin permiso de red local).
-        case waiting(NWError)
+        case waiting(NetworkIssue)
         /// Un frame recibido; `failure` si no se pudo decodificar.
         case message(Result<Incoming, any Error>)
         /// Fin de la conexión. Se emite una sola vez.
-        case closed(NWError?)
+        case closed(NetworkIssue?)
     }
 
     private let connection: NWConnection
@@ -68,7 +68,7 @@ final class MessageConnection<Incoming: Decodable, Outgoing: Encodable> {
         case .ready:
             onEvent(.ready)
         case let .waiting(error):
-            onEvent(.waiting(error))
+            onEvent(.waiting(NetworkIssue(error, path: connection.currentPath)))
         case let .failed(error):
             close(error)
         case .cancelled:
@@ -110,7 +110,9 @@ final class MessageConnection<Incoming: Decodable, Outgoing: Encodable> {
     private func close(_ error: NWError?) {
         guard !isClosed else { return }
         isClosed = true
+        // La ruta se lee antes de cancelar: explica por qué se cayó (p. ej. red local denegada).
+        let issue = error.map { NetworkIssue($0, path: connection.currentPath) }
         connection.cancel()
-        onEvent(.closed(error))
+        onEvent(.closed(issue))
     }
 }
