@@ -75,9 +75,9 @@ extension ClientMessage: Codable {
     }
 }
 
-enum Volume {
+public enum Volume {
     /// 0.0–1.0 inclusive. `NaN` no pasa.
-    static func isValid(_ value: Float) -> Bool {
+    public static func isValid(_ value: Float) -> Bool {
         (0...1).contains(value)
     }
 }

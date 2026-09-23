@@ -14,6 +14,8 @@ configFiles:
 packages:
   LevelDeckKit:
     path: Packages/LevelDeckKit
+  LevelDeckAgentKit:
+    path: Packages/LevelDeckAgentKit
 
 settingGroups:
   swift:
@@ -29,6 +31,10 @@ targets:
     sources: [LevelDeckAgent]
     dependencies:
       - package: LevelDeckKit
+      - package: LevelDeckAgentKit
+        product: AgentAudio
+      - package: LevelDeckAgentKit
+        product: AgentCoreAudio
     settings:
       groups: [swift]
       base:

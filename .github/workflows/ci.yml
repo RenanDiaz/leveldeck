@@ -19,5 +19,5 @@ jobs:
         run: xcodebuild -version && swift --version
       - name: Instalar XcodeGen
         run: brew install xcodegen
-      - name: Verificar Fase 0
+      - name: Verificar build y tests
         run: scripts/verify.sh

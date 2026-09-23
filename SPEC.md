@@ -1,7 +1,7 @@
 # SPEC — LevelDeck
 
 > Deriva de `INTENT.md`. Si algo aquí contradice el intent, manda el intent.
-> Estado: borrador v1.1 (decisiones de la Fase 0 incorporadas)
+> Estado: borrador v1.2 (entrada con la misma prioridad que la salida desde la Fase 1)
 
 ## 1. Resumen
 
@@ -38,13 +38,16 @@ leveldeck/
 ├── LevelDeckAgent/    # target macOS (app de barra de menú)
 ├── LevelDeck/         # target iOS
 └── Packages/
-    └── LevelDeckKit/     # Swift Package compartido
-        ├── Protocol/  # modelos de mensajes (Codable), versión del protocolo
-        ├── Transport/ # wrappers de Network.framework, framing, TLS-PSK
-        └── Pairing/   # formato del QR, almacenamiento en Keychain
+    ├── LevelDeckKit/     # Swift Package compartido
+    │   ├── Protocol/  # modelos de mensajes (Codable), versión del protocolo
+    │   ├── Transport/ # wrappers de Network.framework, framing, TLS-PSK
+    │   └── Pairing/   # formato del QR, almacenamiento en Keychain
+    └── LevelDeckAgentKit/  # Swift Package solo macOS, usado por el agente
+        ├── AgentAudio/     # AudioControlling y AudioModel (lógica de estado, sin CoreAudio)
+        └── AgentCoreAudio/ # CoreAudioController: implementación real sobre CoreAudio
 ```
 
-La lógica de protocolo y transporte vive en `LevelDeckKit` y se prueba de forma aislada.
+La lógica de protocolo y transporte vive en `LevelDeckKit` y se prueba de forma aislada. La lógica de audio del agente vive en `LevelDeckAgentKit`: `AgentAudio` se prueba con un mock de `AudioControlling` y `AgentCoreAudio` se verifica a mano contra el hardware.
 
 El proyecto de Xcode se genera con `xcodegen generate` a partir de `project.yml` y no se versiona (`*.xcodeproj` está en `.gitignore`). No hay `.xcworkspace`: el paquete local se referencia desde `project.yml`. Bundle IDs: `com.renandiaz.LevelDeckAgent` (macOS) y `com.renandiaz.LevelDeck` (iOS).
 
@@ -54,7 +57,7 @@ El proyecto de Xcode se genera con `xcodegen generate` a partir de `project.yml`
 
 - Vive en la barra de menú (`MenuBarExtra`), sin ícono en el Dock (`LSUIElement = YES`).
 - Se registra como login item con `SMAppService.mainApp` (con opción en el menú para desactivarlo).
-- El menú muestra: estado del servicio, dispositivos emparejados, "Emparejar nuevo dispositivo…", volumen actual como referencia y Salir.
+- El menú (estilo ventana, `.menuBarExtraStyle(.window)`) muestra: sliders de volumen de salida y entrada con mute, estado del servicio, dispositivos emparejados, "Emparejar nuevo dispositivo…" y Salir.
 
 ### 5.2 Servicio de audio (`AudioController`)
 
@@ -72,7 +75,10 @@ Wrapper sobre CoreAudio, detrás de un protocolo (`AudioControlling`) para poder
 Reglas:
 
 - El volumen se expresa como `Float` normalizado en el rango 0.0–1.0.
+- Salida y entrada son simétricas: toda la API de `AudioControlling` se parametriza por `Scope`.
 - Antes de exponer un control, verificar con `AudioObjectIsPropertySettable`. Algunos dispositivos (HDMI, ciertas interfaces USB) no permiten cambiar el volumen. En ese caso el control se reporta como `settable: false` y el cliente lo muestra deshabilitado.
+- La configurabilidad del volumen y del mute se evalúa por separado (hay micrófonos con volumen y sin mute, y al revés). Internamente el agente lleva `volumeSettable` y `muteSettable`; el protocolo solo expone `settable` (volumen) hasta la Fase 4, que agrega `muteSettable`.
+- Puede no haber dispositivo por defecto para un scope (p. ej. un Mac mini sin micrófono). El agente lo modela como canal ausente y el menú muestra "Sin dispositivo". Cómo se representa en el protocolo se decide en la Fase 2.
 - Al cambiar el dispositivo por defecto, re-suscribir los listeners al nuevo dispositivo.
 - Cualquier cambio, venga del cliente o de fuera, produce un único evento de estado que se envía a todos los clientes conectados.
 
@@ -164,16 +170,21 @@ Cada fase termina con algo que se puede usar y probar.
 **Fase 0 — Esqueleto.** Workspace, dos targets, paquete `LevelDeckKit` con los modelos del protocolo y sus tests de codificación y decodificación.
 *Listo cuando:* `xcodegen generate` funciona, compilan ambos targets con `xcodebuild` y pasan los tests de `LevelDeckKit` (`scripts/verify.sh`, que también corre en CI sobre `macos-15`).
 
-**Fase 1 — Audio en la Mac.** `AudioController` con volumen y mute de salida, más listeners. El menú muestra un slider que refleja y controla el volumen.
-*Listo cuando:* mover el slider cambia el volumen del sistema, y cambiar el volumen con el teclado mueve el slider.
+**Fase 1 — Audio en la Mac.** `AudioController` con volumen y mute de salida y de entrada, parametrizado por `Scope`, más listeners. El menú muestra un slider con mute por cada scope que refleja y controla el sistema.
+*Listo cuando:*
+- el menú muestra sliders de salida y entrada con mute, y controlan el sistema;
+- los cambios externos (teclado, Ajustes del Sistema) mueven los sliders;
+- cambiar el dispositivo por defecto re-suscribe los listeners;
+- un dispositivo no configurable deshabilita su slider sin fallar;
+- la lógica de estado se prueba con un mock de `AudioControlling` y pasa en CI; la verificación con hardware real es un checklist manual en el PR.
 
-**Fase 2 — Conexión local (sin seguridad, solo en desarrollo).** `RemoteServer` con Bonjour y WebSocket en claro detrás de un flag de debug. El cliente iOS descubre, conecta y muestra un fader de salida sincronizado.
+**Fase 2 — Conexión local (sin seguridad, solo en desarrollo).** `RemoteServer` con Bonjour y WebSocket en claro detrás de un flag de debug. El cliente iOS descubre, conecta y muestra los faders de salida y entrada sincronizados.
 *Listo cuando:* los cambios en cualquiera de los dos lados se reflejan en el otro en menos de 100 ms en la red local.
 
 **Fase 3 — Emparejamiento y TLS-PSK.** QR, Keychain, TLS-PSK y revocación. Se elimina el modo en claro de los builds de release.
 *Listo cuando:* un iPhone sin emparejar no puede conectar, uno emparejado conecta automáticamente y uno revocado queda desconectado.
 
-**Fase 4 — Mixer completo.** Entrada, mute, selector de dispositivo, manejo de `settable: false` y varios clientes simultáneos.
+**Fase 4 — Mixer completo.** Mute en el cliente iOS, selector de dispositivo, manejo de `settable: false` y `muteSettable` en el protocolo y el cliente, y varios clientes simultáneos.
 *Listo cuando:* los dos faders y el selector funcionan, y conectar un monitor HDMI sin control de volumen deshabilita el fader sin romper nada.
 
 **Fase 5 — Pulido.** Reconexión con backoff, supresión de eco durante el arrastre, hápticos, login item y opción de desactivarlo.
