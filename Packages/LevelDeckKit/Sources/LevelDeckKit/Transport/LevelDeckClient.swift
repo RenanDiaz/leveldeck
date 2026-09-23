@@ -30,6 +30,8 @@ public final class LevelDeckClient {
     private let deviceName: String
     private let helloVersion: Int
     @ObservationIgnored private var connection: MessageConnection<AgentMessage, ClientMessage>?
+    /// Conexión TCP corta que resuelve un endpoint Bonjour a host y puerto.
+    @ObservationIgnored private var resolver: NWConnection?
     /// Identifica la conexión vigente para descartar eventos de una anterior ya cancelada.
     @ObservationIgnored private var connectionID: UUID?
 
@@ -48,26 +50,25 @@ public final class LevelDeckClient {
         self.helloVersion = helloVersion
     }
 
+    /// El WebSocket del cliente necesita un endpoint URL (`ws://host:port/`): con `hostPort` o
+    /// con un servicio Bonjour aborta la conexión antes del upgrade (NWError 53). Un servicio se
+    /// resuelve primero a host y puerto; un `hostPort` se convierte directamente.
     public func connect() {
-        connectionID = nil
-        connection?.cancel()
+        cancelConnection()
         let id = UUID()
-        let connection = MessageConnection<AgentMessage, ClientMessage>(
-            connection: NWConnection(to: endpoint, using: security.makeParameters())
-        ) { [weak self] event in
-            self?.handle(event, from: id)
-        }
         connectionID = id
-        self.connection = connection
         lastError = nil
         status = .connecting
-        connection.start()
+        switch endpoint {
+        case .service:
+            resolve(endpoint, id: id)
+        default:
+            open(endpoint, id: id)
+        }
     }
 
     public func disconnect() {
-        connectionID = nil
-        connection?.cancel()
-        connection = nil
+        cancelConnection()
         status = .idle
     }
 
@@ -80,6 +81,90 @@ public final class LevelDeckClient {
     /// Envía un frame crudo. Solo para tests de mensajes inválidos.
     func sendRaw(_ data: Data) {
         connection?.sendData(data)
+    }
+
+    private func cancelConnection() {
+        connectionID = nil
+        resolver?.cancel()
+        resolver = nil
+        connection?.cancel()
+        connection = nil
+    }
+
+    private func open(_ target: NWEndpoint, id: UUID) {
+        guard let url = Self.webSocketURL(for: target) else {
+            status = .disconnected("No se puede conectar a \(target).")
+            return
+        }
+        let connection = MessageConnection<AgentMessage, ClientMessage>(
+            connection: NWConnection(to: .url(url), using: security.makeParameters())
+        ) { [weak self] event in
+            self?.handle(event, from: id)
+        }
+        self.connection = connection
+        connection.start()
+    }
+
+    private func resolve(_ service: NWEndpoint, id: UUID) {
+        let parameters = NWParameters.tcp
+        // IPv4 evita armar URLs con direcciones IPv6 link-local y su zona (`%en0`).
+        if let ip = parameters.defaultProtocolStack.internetProtocol as? NWProtocolIP.Options {
+            ip.version = .v4
+        }
+        let resolver = NWConnection(to: service, using: parameters)
+        resolver.stateUpdateHandler = { [weak self] state in
+            MainActor.assumeIsolated { self?.resolverStateChanged(state, id: id) }
+        }
+        self.resolver = resolver
+        resolver.start(queue: .main)
+    }
+
+    private func resolverStateChanged(_ state: NWConnection.State, id: UUID) {
+        guard id == connectionID, let resolver else { return }
+        switch state {
+        case .ready:
+            let remote = resolver.currentPath?.remoteEndpoint
+            resolver.cancel()
+            self.resolver = nil
+            if let remote {
+                open(remote, id: id)
+            } else {
+                status = .disconnected("No se pudo resolver la dirección del agente.")
+            }
+        case let .waiting(error):
+            status = .waiting(error.localizedDescription)
+        case let .failed(error):
+            resolver.cancel()
+            self.resolver = nil
+            connectionID = nil
+            status = .disconnected(error.localizedDescription)
+        default:
+            break
+        }
+    }
+
+    /// `ws://host:port/` para un endpoint `hostPort`; un endpoint URL se usa tal cual.
+    static func webSocketURL(for endpoint: NWEndpoint) -> URL? {
+        switch endpoint {
+        case let .url(url):
+            return url
+        case let .hostPort(host, port):
+            let hostText: String
+            switch host {
+            case let .ipv4(address):
+                hostText = address.rawValue.map(String.init).joined(separator: ".")
+            case let .ipv6(address):
+                // Literal entre corchetes; la zona (`%en0`) va escapada como `%25` (RFC 6874).
+                hostText = "[\("\(address)".replacingOccurrences(of: "%", with: "%25"))]"
+            case let .name(name, _):
+                hostText = name
+            @unknown default:
+                return nil
+            }
+            return URL(string: "ws://\(hostText):\(port.rawValue)/")
+        default:
+            return nil
+        }
     }
 
     private func handle(_ event: MessageConnection<AgentMessage, ClientMessage>.Event, from id: UUID) {
