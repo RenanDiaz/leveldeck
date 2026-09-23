@@ -14,13 +14,19 @@ public struct ChannelState: Codable, Sendable, Equatable {
     public var muted: Bool
     /// `false` si el dispositivo no permite cambiar el volumen (p. ej. HDMI).
     public var settable: Bool
+    /// `false` si el dispositivo no permite cambiar el mute. Se evalúa aparte del volumen.
+    public var muteSettable: Bool
 
-    public init(deviceId: String, deviceName: String, volume: Float, muted: Bool, settable: Bool) {
+    public init(
+        deviceId: String, deviceName: String, volume: Float, muted: Bool,
+        settable: Bool, muteSettable: Bool
+    ) {
         self.deviceId = deviceId
         self.deviceName = deviceName
         self.volume = volume
         self.muted = muted
         self.settable = settable
+        self.muteSettable = muteSettable
     }
 }
 
@@ -47,14 +53,31 @@ public struct DeviceList: Codable, Sendable, Equatable {
 
 /// Snapshot completo que el agente envía en cada mensaje `state`.
 public struct StateSnapshot: Codable, Sendable, Equatable {
-    public var output: ChannelState
-    public var input: ChannelState
+    /// `nil` si no hay dispositivo de salida por defecto. En el cable viaja como `null`.
+    public var output: ChannelState?
+    /// `nil` si no hay dispositivo de entrada por defecto (p. ej. un Mac mini sin micrófono).
+    public var input: ChannelState?
     public var devices: DeviceList
 
-    public init(output: ChannelState, input: ChannelState, devices: DeviceList) {
+    public init(output: ChannelState?, input: ChannelState?, devices: DeviceList) {
         self.output = output
         self.input = input
         self.devices = devices
+    }
+
+    public subscript(_ scope: Scope) -> ChannelState? {
+        get {
+            switch scope {
+            case .output: output
+            case .input: input
+            }
+        }
+        set {
+            switch scope {
+            case .output: output = newValue
+            case .input: input = newValue
+            }
+        }
     }
 }
 

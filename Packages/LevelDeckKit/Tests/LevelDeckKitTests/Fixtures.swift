@@ -9,9 +9,9 @@ enum Fixtures {
       "type": "state",
       "v": 1,
       "output": { "deviceId": "BuiltInSpeakerDevice", "deviceName": "MacBook Pro Speakers",
-                  "volume": 0.62, "muted": false, "settable": true },
+                  "volume": 0.62, "muted": false, "settable": true, "muteSettable": true },
       "input":  { "deviceId": "BuiltInMicrophoneDevice", "deviceName": "MacBook Pro Microphone",
-                  "volume": 0.80, "muted": false, "settable": true },
+                  "volume": 0.80, "muted": false, "settable": true, "muteSettable": true },
       "devices": {
         "output": [{ "id": "BuiltInSpeakerDevice", "name": "MacBook Pro Speakers" }],
         "input":  [{ "id": "BuiltInMicrophoneDevice", "name": "MacBook Pro Microphone" }]
@@ -22,11 +22,11 @@ enum Fixtures {
     static let snapshot = StateSnapshot(
         output: ChannelState(
             deviceId: "BuiltInSpeakerDevice", deviceName: "MacBook Pro Speakers",
-            volume: 0.62, muted: false, settable: true
+            volume: 0.62, muted: false, settable: true, muteSettable: true
         ),
         input: ChannelState(
             deviceId: "BuiltInMicrophoneDevice", deviceName: "MacBook Pro Microphone",
-            volume: 0.80, muted: false, settable: true
+            volume: 0.80, muted: false, settable: true, muteSettable: true
         ),
         devices: DeviceList(
             output: [DeviceInfo(id: "BuiltInSpeakerDevice", name: "MacBook Pro Speakers")],

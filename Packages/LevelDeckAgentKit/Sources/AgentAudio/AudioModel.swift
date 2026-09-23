@@ -13,6 +13,10 @@ public final class AudioModel {
     /// Último error de una lectura o escritura. Se limpia con la siguiente operación exitosa.
     public private(set) var lastError: AudioControlError?
 
+    /// Se llama después de cada lectura o escritura exitosa, venga del menú, de un cliente
+    /// remoto o de fuera. El servidor la usa para enviar `state`; él mismo descarta repetidos.
+    @ObservationIgnored public var onChange: (@MainActor () -> Void)?
+
     private let controller: any AudioControlling
     @ObservationIgnored public private(set) var isRunning = false
 
@@ -55,6 +59,7 @@ public final class AudioModel {
         do throws(AudioControlError) {
             channels[scope] = try controller.channel(scope)
             lastError = nil
+            onChange?()
         } catch {
             lastError = error
         }
@@ -99,6 +104,7 @@ public final class AudioModel {
         do throws(AudioControlError) {
             try write()
             lastError = nil
+            onChange?()
         } catch {
             refresh(scope)
             lastError = error
