@@ -66,6 +66,8 @@ public final class LevelDeckServer {
     @ObservationIgnored private var listener: NWListener?
     @ObservationIgnored private var sessions: [UUID: Session] = [:]
     @ObservationIgnored private var broadcaster: ThrottledSender<StateSnapshot>?
+    /// Últimos eventos de conexión, para diagnosticar fallos en tests.
+    @ObservationIgnored private(set) var connectionEvents: [String] = []
 
     /// - Parameters:
     ///   - advertise: anunciar el servicio por Bonjour. Los tests en loopback lo apagan.
@@ -171,6 +173,7 @@ public final class LevelDeckServer {
 
     private func accept(_ nwConnection: NWConnection) {
         let id = UUID()
+        connectionEvents.append("accept(\(nwConnection.endpoint))")
         let connection = MessageConnection<ClientMessage, AgentMessage>(connection: nwConnection) {
             [weak self] event in
             self?.handle(event, from: id)
@@ -181,6 +184,7 @@ public final class LevelDeckServer {
 
     private func handle(_ event: MessageConnection<ClientMessage, AgentMessage>.Event, from id: UUID) {
         guard let session = sessions[id] else { return }
+        log(event)
         switch event {
         case .ready, .waiting:
             break
@@ -221,6 +225,20 @@ public final class LevelDeckServer {
         }
         // El dedup del broadcaster evita un `state` repetido si el comando no cambió nada.
         stateDidChange()
+    }
+
+    private func log(_ event: MessageConnection<ClientMessage, AgentMessage>.Event) {
+        let text: String
+        switch event {
+        case .ready: text = "ready"
+        case let .waiting(error): text = "waiting(\(error))"
+        case let .closed(error): text = "closed(\(error.map { "\($0)" } ?? "nil"))"
+        case .message: return
+        }
+        connectionEvents.append(text)
+        if connectionEvents.count > 20 {
+            connectionEvents.removeFirst(connectionEvents.count - 20)
+        }
     }
 
     private func broadcast(_ state: StateSnapshot) {

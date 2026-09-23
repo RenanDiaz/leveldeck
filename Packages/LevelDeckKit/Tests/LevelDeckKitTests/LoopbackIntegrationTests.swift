@@ -16,9 +16,8 @@ struct LoopbackIntegrationTests {
     let server: LevelDeckServer
 
     init() async throws {
-        server = LevelDeckServer(
-            security: .insecurePlaintext, advertise: false, requiredInterfaceType: .loopback
-        )
+        // El cliente conecta a 127.0.0.1; el listener no se restringe a la interfaz de loopback.
+        server = LevelDeckServer(security: .insecurePlaintext, advertise: false)
         server.delegate = agent
         server.start()
         let server = server
@@ -158,7 +157,7 @@ struct LoopbackIntegrationTests {
         let server = server
         recorder.describeContext = { [weak client] in
             "cliente=\(client.map { "\($0.status)" } ?? "nil") servidor=\(server.status) "
-                + "clientes=\(server.clients.map(\.deviceName))"
+                + "clientes=\(server.clients.map(\.deviceName)) eventos=\(server.connectionEvents)"
         }
         client.connect()
         return (client, recorder)
