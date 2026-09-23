@@ -18,10 +18,10 @@ Hoy, para ajustar el volumen tengo que estar frente a la Mac: usar el teclado, l
 
 ## Qué quiero poder controlar
 
-En orden de importancia:
+En orden de importancia (1 y 2 tienen la misma prioridad):
 
 1. Volumen general de salida y mute.
-2. Volumen del micrófono (entrada) y mute.
+2. Volumen de entrada (micrófono o interfaz) y mute.
 3. Elegir el dispositivo de salida y de entrada activos.
 4. Volumen por aplicación. Es deseable, pero sé que macOS no lo ofrece de forma nativa. Quiero entender el costo antes de comprometerme con esto.
 
