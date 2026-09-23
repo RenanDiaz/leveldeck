@@ -30,6 +30,9 @@ public struct AudioChannel: Sendable, Equatable {
 public enum AudioControlError: Error, Sendable, Equatable {
     /// No hay dispositivo por defecto para el scope.
     case noDevice(Scope)
+    /// El dispositivo pedido no existe, está oculto o no tiene streams en ese scope
+    /// (p. ej. se desconectó entre que el cliente vio la lista y lo eligió).
+    case deviceNotFound(Scope)
     /// El dispositivo no permite cambiar ese control.
     case notSettable(Scope)
     /// Volumen fuera de 0.0–1.0 o `NaN`. No se recorta.
@@ -48,8 +51,16 @@ public protocol AudioControlling: AnyObject {
     func channel(_ scope: Scope) throws(AudioControlError) -> AudioChannel?
     func setVolume(_ value: Float, scope: Scope) throws(AudioControlError)
     func setMute(_ muted: Bool, scope: Scope) throws(AudioControlError)
-    /// Empieza a observar cambios de volumen, mute y dispositivo por defecto.
-    /// `onChange` recibe el scope afectado; el receptor relee el canal completo.
+    /// Dispositivos que se pueden elegir en el scope: los que tienen streams en él y no están
+    /// ocultos (`kAudioDevicePropertyIsHidden`). Los virtuales (BlackHole, Zoom, Teams) cuentan.
+    /// Ordenados por nombre.
+    func devices(_ scope: Scope) throws(AudioControlError) -> [DeviceInfo]
+    /// Vuelve dispositivo por defecto del scope al que tiene ese UID.
+    /// Lanza `.deviceNotFound` si no está en `devices(scope)`.
+    func setDefaultDevice(_ deviceId: String, scope: Scope) throws(AudioControlError)
+    /// Empieza a observar cambios de volumen, mute, dispositivo por defecto y lista de
+    /// dispositivos. `onChange` recibe el scope afectado (un cambio en la lista llega para
+    /// ambos); el receptor relee el canal y la lista de ese scope.
     func startObserving(_ onChange: @escaping @MainActor (Scope) -> Void)
     func stopObserving()
 }

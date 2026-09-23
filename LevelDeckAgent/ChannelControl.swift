@@ -41,11 +41,20 @@ struct ChannelControl: View {
                 )
                 .disabled(!audio.canSetVolume(scope))
             }
-            if let channel, !channel.volumeSettable {
-                Text("This device doesn't allow changing the volume.")
+            if let channel, let note = settabilityNote(channel) {
+                Text(note)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    private func settabilityNote(_ channel: AudioChannel) -> String? {
+        switch (channel.volumeSettable, channel.muteSettable) {
+        case (true, true): nil
+        case (false, true): String(localized: "This device doesn't allow changing the volume.")
+        case (true, false): String(localized: "This device doesn't allow muting.")
+        case (false, false): String(localized: "This device doesn't allow changing the volume or muting.")
         }
     }
 

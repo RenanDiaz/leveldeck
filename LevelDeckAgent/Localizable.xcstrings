@@ -351,12 +351,32 @@
         }
       }
     },
+    "This device doesn't allow changing the volume or muting.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este dispositivo no permite cambiar el volumen ni silenciar."
+          }
+        }
+      }
+    },
     "This device doesn't allow changing the volume.": {
       "localizations": {
         "es": {
           "stringUnit": {
             "state": "translated",
             "value": "Este dispositivo no permite cambiar el volumen."
+          }
+        }
+      }
+    },
+    "This device doesn't allow muting.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este dispositivo no permite silenciar."
           }
         }
       }

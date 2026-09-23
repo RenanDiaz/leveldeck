@@ -4,8 +4,15 @@
 /// Durante la supresión, los `state` entrantes igual actualizan mute, nombre y configurabilidad;
 /// solo se retiene el volumen. Al vencer la supresión (`settle`), se aplica el último volumen
 /// retenido para no quedar desincronizado si el agente terminó en otro valor.
+///
+/// Si el dispositivo por defecto cambia a mitad de un arrastre (otro cliente, la Mac o una
+/// desconexión), manda el agente y ese arrastre queda invalidado: el cliente deja de enviar
+/// hasta el próximo toque, para no pisar el volumen del dispositivo nuevo.
 public struct MixerState: Sendable {
     public private(set) var channels: [Scope: ChannelState] = [:]
+    /// Dispositivos disponibles según el último `state`. Nunca se retienen.
+    public private(set) var devices = DeviceList(output: [], input: [])
+    private var invalidatedDrags: Set<Scope> = []
     private var gates: [Scope: EchoGate] = [:]
     private var heldRemoteVolume: [Scope: Float] = [:]
     private var lastRemote: StateSnapshot?
@@ -23,20 +30,29 @@ public struct MixerState: Sendable {
         gates[scope]?.isInteracting ?? false
     }
 
+    /// `false` si el arrastre en curso quedó invalidado por un cambio de dispositivo: sus
+    /// valores ya no se muestran ni se deben enviar.
+    public func acceptsDrag(_ scope: Scope) -> Bool {
+        !invalidatedDrags.contains(scope)
+    }
+
     public mutating func apply(_ snapshot: StateSnapshot, now: ContinuousClock.Instant) {
         lastRemote = snapshot
+        devices = snapshot.devices
         for scope in Scope.allCases {
+            let suppressing = gate(scope).suppresses(now: now)
             guard var remote = snapshot[scope] else {
+                if suppressing { invalidateDrag(scope) }
                 channels[scope] = nil
                 heldRemoteVolume[scope] = nil
                 continue
             }
-            // Si cambió el dispositivo, el valor local ya no aplica: manda el agente.
-            if gate(scope).suppresses(now: now), let local = channels[scope],
-               local.deviceId == remote.deviceId {
+            if suppressing, let local = channels[scope], local.deviceId == remote.deviceId {
                 heldRemoteVolume[scope] = remote.volume
                 remote.volume = local.volume
             } else {
+                // Si cambió el dispositivo, el valor local ya no aplica: manda el agente.
+                if suppressing { invalidateDrag(scope) }
                 heldRemoteVolume[scope] = nil
             }
             channels[scope] = remote
@@ -44,18 +60,23 @@ public struct MixerState: Sendable {
     }
 
     public mutating func beginDrag(_ scope: Scope) {
+        invalidatedDrags.remove(scope)
         let hold = self.hold
         gates[scope, default: EchoGate(hold: hold)].begin()
     }
 
+    /// Mueve el fader localmente. No hace nada si el arrastre quedó invalidado.
     public mutating func drag(_ scope: Scope, to value: Float) {
+        guard acceptsDrag(scope) else { return }
         channels[scope]?.volume = value
     }
 
-    /// Devuelve cuándo llamar a `settle` para ese scope.
+    /// Devuelve cuándo llamar a `settle` para ese scope, o `nil` si no hace falta (también
+    /// si el arrastre quedó invalidado).
     public mutating func endDrag(
         _ scope: Scope, at value: Float, now: ContinuousClock.Instant
     ) -> ContinuousClock.Instant? {
+        guard acceptsDrag(scope) else { return nil }
         channels[scope]?.volume = value
         let hold = self.hold
         gates[scope, default: EchoGate(hold: hold)].end(now: now)
@@ -79,6 +100,12 @@ public struct MixerState: Sendable {
         if let lastRemote {
             apply(lastRemote, now: now)
         }
+    }
+
+    /// El arrastre en curso deja de mandar: se abre la compuerta y se descarta lo retenido.
+    private mutating func invalidateDrag(_ scope: Scope) {
+        invalidatedDrags.insert(scope)
+        gates[scope] = EchoGate(hold: hold)
     }
 
     private func gate(_ scope: Scope) -> EchoGate {

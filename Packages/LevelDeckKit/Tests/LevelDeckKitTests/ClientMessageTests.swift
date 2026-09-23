@@ -37,7 +37,7 @@ struct ClientMessageTests {
 
     @Test func decodesHelloWithoutDeviceId() throws {
         // Un `hello` de la Fase 2 (sin deviceId) sigue siendo válido; el authorizer decide.
-        let json = Data(#"{"type":"hello","v":1,"deviceName":"iPhone"}"#.utf8)
+        let json = Data(#"{"type":"hello","v":2,"deviceName":"iPhone"}"#.utf8)
         #expect(try ProtocolCoder.decode(ClientMessage.self, from: json) == .hello(deviceName: "iPhone", deviceId: nil))
     }
 
@@ -57,8 +57,8 @@ struct ClientMessageTests {
 
     @Test func decodesHelloWithOtherVersion() throws {
         // La decodificación no valida la versión: eso le toca al agente, que responde `unsupportedVersion`.
-        let json = Data(#"{"type":"hello","v":2,"deviceName":"iPhone"}"#.utf8)
-        #expect(try ProtocolCoder.decode(ClientMessage.self, from: json) == .hello(deviceName: "iPhone", version: 2))
+        let json = Data(#"{"type":"hello","v":1,"deviceName":"iPhone"}"#.utf8)
+        #expect(try ProtocolCoder.decode(ClientMessage.self, from: json) == .hello(deviceName: "iPhone", version: 1))
     }
 
     @Test("Rechaza volumen fuera de 0–1", arguments: ["-0.01", "1.01", "42"])

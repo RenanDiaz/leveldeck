@@ -5,7 +5,8 @@ import Observation
 ///
 /// Arma la sincronización del fader (SPEC §6.2): cada fader envía como máximo 30 `setVolume`
 /// por segundo y siempre el valor final al soltar; mientras se arrastra, y ~300 ms después,
-/// los `state` entrantes no mueven su volumen (`MixerState`).
+/// los `state` entrantes no mueven su volumen (`MixerState`). Si otro cliente o la Mac cambian
+/// el dispositivo a mitad del arrastre, ese arrastre deja de enviar.
 @MainActor
 @Observable
 final class MixerModel {
@@ -15,11 +16,16 @@ final class MixerModel {
     /// RTT de `setVolume` → `state` para el overlay de debug.
     private(set) var roundTrip = RoundTripMeter()
 
+    /// Último error del agente, para mostrarlo un momento. Se borra solo: el estado ya se
+    /// resincronizó con el agente, así que no queda nada que el usuario tenga que resolver.
+    private(set) var notice: AgentError?
+
     /// La Mac revocó este iPhone (`error` `notPaired`, SPEC §7): la clave ya no sirve.
     @ObservationIgnored var onUnpaired: (@MainActor () -> Void)?
 
     @ObservationIgnored private var senders: [Scope: ThrottledSender<Float>] = [:]
     @ObservationIgnored private var settleTasks: [Scope: Task<Void, Never>] = [:]
+    @ObservationIgnored private var noticeTask: Task<Void, Never>?
 
     init(agentName: String, client: LevelDeckClient) {
         self.agentName = agentName
@@ -36,10 +42,14 @@ final class MixerModel {
 
     var status: LevelDeckClient.Status { client.status }
     var isConnected: Bool { client.status == .connected }
-    var lastError: AgentError? { client.lastError }
 
     func channel(_ scope: Scope) -> ChannelState? {
         mixer[scope]
+    }
+
+    /// Dispositivos que la Mac ofrece para el scope, según el último `state`.
+    func devices(_ scope: Scope) -> [DeviceInfo] {
+        mixer.devices[scope]
     }
 
     func connect() {
@@ -59,11 +69,14 @@ final class MixerModel {
     }
 
     func dragChanged(_ scope: Scope, to value: Float) {
+        // Si cambió el dispositivo a mitad del arrastre, manda el agente hasta el próximo toque.
+        guard mixer.acceptsDrag(scope) else { return }
         mixer.drag(scope, to: value)
         senders[scope]?.submit(value)
     }
 
     func dragEnded(_ scope: Scope, at value: Float) {
+        guard mixer.acceptsDrag(scope) else { return }
         senders[scope]?.finish(value)
         guard let deadline = mixer.endDrag(scope, at: value, now: .now) else { return }
         settleTasks[scope] = Task { [weak self] in
@@ -81,6 +94,15 @@ final class MixerModel {
         let muted = !channel.muted
         mixer.setMuted(muted, scope: scope)
         client.send(.setMute(scope: scope, muted: muted))
+    }
+
+    // MARK: - Dispositivo
+
+    /// Pide a la Mac que ese dispositivo sea el default. Sin optimismo: el cambio se ve cuando
+    /// llega el `state`, y si el dispositivo ya no existe llega `deviceNotFound`.
+    func selectDevice(_ deviceId: String, scope: Scope) {
+        guard isConnected, mixer[scope]?.deviceId != deviceId else { return }
+        client.send(.setDefaultDevice(scope: scope, deviceId: deviceId))
     }
 
     // MARK: - Red
@@ -101,11 +123,35 @@ final class MixerModel {
                 }
             }
             mixer.apply(snapshot, now: now)
+            cancelInvalidatedDrags()
         case .error(.notPaired, _):
             onUnpaired?()
-        case .error:
+        case let .error(code, message):
             // El comando no se aplicó: volver a lo último que dijo el agente.
             mixer.resync(now: now)
+            show(AgentError(code, message))
+        }
+    }
+
+    /// Un arrastre invalidado no puede dejar un `setVolume` programado para el dispositivo nuevo.
+    private func cancelInvalidatedDrags() {
+        for scope in Scope.allCases where !mixer.acceptsDrag(scope) {
+            senders[scope]?.cancel()
+            settleTasks[scope]?.cancel()
+            settleTasks[scope] = nil
+        }
+    }
+
+    private func show(_ error: AgentError) {
+        notice = error
+        noticeTask?.cancel()
+        noticeTask = Task { [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(4))
+            } catch {
+                return
+            }
+            self?.notice = nil
         }
     }
 }

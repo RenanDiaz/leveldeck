@@ -13,19 +13,20 @@ public struct ChannelState: Codable, Sendable, Equatable {
     public var volume: Float
     public var muted: Bool
     /// `false` si el dispositivo no permite cambiar el volumen (p. ej. HDMI).
-    public var settable: Bool
-    /// `false` si el dispositivo no permite cambiar el mute. Se evalúa aparte del volumen.
+    public var volumeSettable: Bool
+    /// `false` si el dispositivo no permite cambiar el mute. Se evalúa aparte del volumen:
+    /// hay dispositivos con uno y sin el otro.
     public var muteSettable: Bool
 
     public init(
         deviceId: String, deviceName: String, volume: Float, muted: Bool,
-        settable: Bool, muteSettable: Bool
+        volumeSettable: Bool, muteSettable: Bool
     ) {
         self.deviceId = deviceId
         self.deviceName = deviceName
         self.volume = volume
         self.muted = muted
-        self.settable = settable
+        self.volumeSettable = volumeSettable
         self.muteSettable = muteSettable
     }
 }
@@ -48,6 +49,21 @@ public struct DeviceList: Codable, Sendable, Equatable {
     public init(output: [DeviceInfo], input: [DeviceInfo]) {
         self.output = output
         self.input = input
+    }
+
+    public subscript(_ scope: Scope) -> [DeviceInfo] {
+        get {
+            switch scope {
+            case .output: output
+            case .input: input
+            }
+        }
+        set {
+            switch scope {
+            case .output: output = newValue
+            case .input: input = newValue
+            }
+        }
     }
 }
 

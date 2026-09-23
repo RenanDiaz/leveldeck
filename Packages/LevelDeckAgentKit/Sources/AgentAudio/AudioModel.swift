@@ -10,6 +10,8 @@ import Observation
 public final class AudioModel {
     /// Canal por scope. Si falta la clave, no hay dispositivo por defecto para ese scope.
     public private(set) var channels: [Scope: AudioChannel] = [:]
+    /// Dispositivos que se pueden elegir, por scope.
+    public private(set) var deviceLists: [Scope: [DeviceInfo]] = [:]
     /// Último error de una lectura o escritura. Se limpia con la siguiente operación exitosa.
     public private(set) var lastError: AudioControlError?
 
@@ -26,6 +28,10 @@ public final class AudioModel {
 
     public func channel(_ scope: Scope) -> AudioChannel? {
         channels[scope]
+    }
+
+    public func devices(_ scope: Scope) -> [DeviceInfo] {
+        deviceLists[scope] ?? []
     }
 
     public func canSetVolume(_ scope: Scope) -> Bool {
@@ -54,14 +60,28 @@ public final class AudioModel {
         controller.stopObserving()
     }
 
-    /// Relee el canal completo de un scope. Si la lectura falla, conserva el último estado.
+    /// Relee la lista de dispositivos y el canal de un scope. Son lecturas independientes: si
+    /// una falla, conserva su último valor y la otra se aplica igual. Al desconectar el
+    /// dispositivo activo, la HAL puede fallar un instante al leer el default viejo, y la
+    /// lista tiene que actualizarse de todas formas.
     public func refresh(_ scope: Scope) {
+        var failure: AudioControlError?
+        var readAny = false
+        do throws(AudioControlError) {
+            deviceLists[scope] = try controller.devices(scope)
+            readAny = true
+        } catch {
+            failure = error
+        }
         do throws(AudioControlError) {
             channels[scope] = try controller.channel(scope)
-            lastError = nil
-            onChange?()
+            readAny = true
         } catch {
-            lastError = error
+            failure = error
+        }
+        lastError = failure
+        if readAny {
+            onChange?()
         }
     }
 
@@ -96,6 +116,20 @@ public final class AudioModel {
         perform(scope) { () throws(AudioControlError) in
             try controller.setMute(muted, scope: scope)
             channels[scope]?.muted = muted
+        }
+    }
+
+    /// Cambia el dispositivo por defecto del scope. Elegir el que ya está activo no hace nada.
+    /// Si falla (p. ej. el dispositivo se desconectó), se resincroniza la lista con el sistema.
+    public func setDefaultDevice(_ deviceId: String, scope: Scope) {
+        guard channels[scope]?.deviceId != deviceId else {
+            lastError = nil
+            return
+        }
+        perform(scope) { () throws(AudioControlError) in
+            try controller.setDefaultDevice(deviceId, scope: scope)
+            // Leer el canal nuevo ya, sin esperar al listener (que llega después y no cambia nada).
+            refresh(scope)
         }
     }
 

@@ -51,6 +51,36 @@
         }
       }
     },
+    "Choose input device": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elegir dispositivo de entrada"
+          }
+        }
+      }
+    },
+    "Choose output device": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elegir dispositivo de salida"
+          }
+        }
+      }
+    },
+    "Connect a device to the Mac to choose it here.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conecta un dispositivo a la Mac para elegirlo aquí."
+          }
+        }
+      }
+    },
     "Connecting to “%@”…": {
       "localizations": {
         "es": {
@@ -181,6 +211,16 @@
         }
       }
     },
+    "Input device": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dispositivo de entrada"
+          }
+        }
+      }
+    },
     "Input volume": {
       "localizations": {
         "es": {
@@ -271,6 +311,16 @@
         }
       }
     },
+    "No devices": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin dispositivos"
+          }
+        }
+      }
+    },
     "No paired Macs yet.": {
       "localizations": {
         "es": {
@@ -327,6 +377,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Salida"
+          }
+        }
+      }
+    },
+    "Output device": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dispositivo de salida"
           }
         }
       }
@@ -471,6 +531,16 @@
         }
       }
     },
+    "That device isn't available on the Mac anymore.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ese dispositivo ya no está disponible en la Mac."
+          }
+        }
+      }
+    },
     "The Mac didn't allow that change.": {
       "localizations": {
         "es": {
@@ -487,16 +557,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "La Mac no reconoció la clave de este iPhone. Vuelve a emparejarlo desde el menú de la Mac."
-          }
-        }
-      }
-    },
-    "The Mac has no default device for that channel.": {
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La Mac no tiene dispositivo por defecto para ese canal."
           }
         }
       }
@@ -567,6 +627,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Este dispositivo no permite cambiar el volumen"
+          }
+        }
+      }
+    },
+    "This device doesn't allow changing the volume or muting": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este dispositivo no permite cambiar el volumen ni silenciar"
+          }
+        }
+      }
+    },
+    "This device doesn't allow muting": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este dispositivo no permite silenciar"
           }
         }
       }
