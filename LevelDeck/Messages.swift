@@ -30,7 +30,7 @@ extension AgentError {
         case .notSettable:
             String(localized: "The Mac didn't allow that change.")
         case .deviceNotFound:
-            String(localized: "The Mac has no default device for that channel.")
+            String(localized: "That device isn't available on the Mac anymore.")
         case .invalidValue:
             String(localized: "The Mac rejected an invalid value.")
         case .unsupportedVersion:

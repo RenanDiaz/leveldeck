@@ -59,10 +59,22 @@ func isRejected(_ client: LevelDeckClient) -> Bool {
 }
 
 /// Agente en memoria: aplica los comandos sobre el snapshot de los fixtures.
+///
+/// `catalog` tiene el estado de cada dispositivo que se puede elegir con `setDefaultDevice`;
+/// solo se puede elegir uno que además esté en `snapshot.devices` (conectado).
 @MainActor
 final class FakeAgent: LevelDeckServerDelegate {
     var snapshot = Fixtures.snapshot
+    var catalog: [String: ChannelState] = [
+        Fixtures.headphones.deviceId: Fixtures.headphones,
+    ]
     private(set) var commands: [ClientMessage] = []
+
+    /// Conecta un dispositivo, como lo vería el agente al enchufarlo.
+    func plug(_ channel: ChannelState, scope: Scope) {
+        catalog[channel.deviceId] = channel
+        snapshot.devices[scope].append(DeviceInfo(id: channel.deviceId, name: channel.deviceName))
+    }
 
     func currentState() -> StateSnapshot {
         snapshot
@@ -77,8 +89,13 @@ final class FakeAgent: LevelDeckServerDelegate {
             snapshot[scope]?.volume = value
         case let .setMute(scope, muted):
             snapshot[scope]?.muted = muted
-        case .setDefaultDevice:
-            return AgentError(.notSettable, "Llega en la Fase 4.")
+        case let .setDefaultDevice(scope, deviceId):
+            guard snapshot.devices[scope].contains(where: { $0.id == deviceId }),
+                  let channel = deviceId == snapshot[scope]?.deviceId ? snapshot[scope] : catalog[deviceId]
+            else {
+                return AgentError(.deviceNotFound, "No existe el dispositivo \(deviceId).")
+            }
+            snapshot[scope] = channel
         }
         return nil
     }
@@ -135,6 +152,14 @@ final class MessageRecorder {
             throw TimeoutError(description: "Se esperaba state y llegó \(message)")
         }
         return snapshot
+    }
+
+    /// Descarta `state` hasta el primero que cumple la condición. Un `error` en el camino falla.
+    func nextState(where condition: (StateSnapshot) -> Bool) async throws -> StateSnapshot {
+        while true {
+            let state = try await nextState()
+            if condition(state) { return state }
+        }
     }
 
     /// El siguiente mensaje debe ser un `error` con ese código.

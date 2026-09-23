@@ -14,8 +14,7 @@ public final class AudioServerBridge: LevelDeckServerDelegate {
         StateSnapshot(
             output: audio.channel(.output).map { ChannelState($0) },
             input: audio.channel(.input).map { ChannelState($0) },
-            // El selector de dispositivo llega en la Fase 4; hasta entonces las listas van vacías.
-            devices: DeviceList(output: [], input: [])
+            devices: DeviceList(output: audio.devices(.output), input: audio.devices(.input))
         )
     }
 
@@ -27,8 +26,8 @@ public final class AudioServerBridge: LevelDeckServerDelegate {
             audio.setVolume(value, scope: scope)
         case let .setMute(scope, muted):
             audio.setMute(muted, scope: scope)
-        case .setDefaultDevice:
-            return AgentError(.notSettable, "Cambiar el dispositivo por defecto llega en la Fase 4.")
+        case let .setDefaultDevice(scope, deviceId):
+            audio.setDefaultDevice(deviceId, scope: scope)
         }
         // `AudioModel` fija `lastError` en todos los caminos: `nil` si la escritura se aplicó.
         return audio.lastError.map(Self.agentError)
@@ -38,6 +37,8 @@ public final class AudioServerBridge: LevelDeckServerDelegate {
         switch error {
         case let .noDevice(scope):
             AgentError(.deviceNotFound, "No hay dispositivo de \(scope.displayName) por defecto.")
+        case let .deviceNotFound(scope):
+            AgentError(.deviceNotFound, "El dispositivo de \(scope.displayName) pedido no está disponible.")
         case let .notSettable(scope):
             AgentError(.notSettable, "El dispositivo de \(scope.displayName) no permite ese cambio.")
         case .invalidValue:
@@ -54,7 +55,7 @@ extension ChannelState {
         self.init(
             deviceId: channel.deviceId, deviceName: channel.deviceName,
             volume: channel.volume, muted: channel.muted,
-            settable: channel.volumeSettable, muteSettable: channel.muteSettable
+            volumeSettable: channel.volumeSettable, muteSettable: channel.muteSettable
         )
     }
 }

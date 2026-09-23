@@ -6,7 +6,7 @@ import Testing
 struct AgentMessageTests {
     @Test func decodesSpecExample() throws {
         let message = try ProtocolCoder.decode(AgentMessage.self, from: Fixtures.stateJSON)
-        #expect(message == .state(Fixtures.snapshot, version: 1))
+        #expect(message == .state(Fixtures.snapshot, version: 2))
     }
 
     @Test func stateRoundTrip() throws {
@@ -30,15 +30,34 @@ struct AgentMessageTests {
         #expect(try Fixtures.object(data)["code"] as? String == code.rawValue)
     }
 
-    @Test func settableFalseSurvivesRoundTrip() throws {
+    @Test func volumeSettableFalseSurvivesRoundTrip() throws {
         var snapshot = Fixtures.snapshot
-        snapshot.output?.settable = false
+        snapshot.output?.volumeSettable = false
         let data = try ProtocolCoder.encode(AgentMessage.state(snapshot))
         guard case let .state(decoded, _) = try ProtocolCoder.decode(AgentMessage.self, from: data) else {
             Issue.record("Se esperaba un mensaje state")
             return
         }
-        #expect(decoded.output?.settable == false)
+        #expect(decoded.output?.volumeSettable == false)
+        #expect(decoded.output?.muteSettable == true)
+    }
+
+    @Test func channelUsesVolumeSettableKey() throws {
+        let object = try Fixtures.object(ProtocolCoder.encode(AgentMessage.state(Fixtures.snapshot)))
+        let output = try #require(object["output"] as? [String: Any])
+        #expect(output["volumeSettable"] as? Bool == true)
+        #expect(output["muteSettable"] as? Bool == true)
+        #expect(output["settable"] == nil)
+    }
+
+    /// Los flags son independientes: mute sin volumen y volumen sin mute viajan tal cual.
+    @Test("Flags de configurabilidad independientes", arguments: [(true, false), (false, true), (false, false)])
+    func independentSettableFlagsSurviveRoundTrip(volume: Bool, mute: Bool) throws {
+        var snapshot = Fixtures.snapshot
+        snapshot.input?.volumeSettable = volume
+        snapshot.input?.muteSettable = mute
+        let data = try ProtocolCoder.encode(AgentMessage.state(snapshot))
+        #expect(try ProtocolCoder.decode(AgentMessage.self, from: data) == .state(snapshot))
     }
 
     @Test func muteSettableSurvivesRoundTrip() throws {
@@ -69,8 +88,20 @@ struct AgentMessageTests {
 
     @Test func rejectsChannelWithoutMuteSettable() {
         let json = Data("""
+        {"type":"state","v":2,"input":null,"devices":{"output":[],"input":[]},
+         "output":{"deviceId":"a","deviceName":"b","volume":0.5,"muted":false,"volumeSettable":true}}
+        """.utf8)
+        #expect(throws: DecodingError.self) {
+            try ProtocolCoder.decode(AgentMessage.self, from: json)
+        }
+    }
+
+    /// La clave de la v1 (`settable`) ya no vale: sin `volumeSettable` no se decodifica.
+    @Test func rejectsChannelWithLegacySettableKey() {
+        let json = Data("""
         {"type":"state","v":1,"input":null,"devices":{"output":[],"input":[]},
-         "output":{"deviceId":"a","deviceName":"b","volume":0.5,"muted":false,"settable":true}}
+         "output":{"deviceId":"a","deviceName":"b","volume":0.5,"muted":false,
+                   "settable":true,"muteSettable":true}}
         """.utf8)
         #expect(throws: DecodingError.self) {
             try ProtocolCoder.decode(AgentMessage.self, from: json)

@@ -55,6 +55,12 @@ public struct SendThrottle<Value: Equatable & Sendable>: Sendable {
         return value
     }
 
+    /// Descarta lo pendiente sin enviar nada (p. ej. el arrastre quedó invalidado porque
+    /// cambió el dispositivo, SPEC §6.2).
+    public mutating func cancel() {
+        pending = nil
+    }
+
     /// Olvida el último valor enviado, pero no cuándo. Se llama al empezar un arrastre: el otro
     /// lado pudo cambiar desde entonces y volver al mismo valor debe enviarse igual.
     public mutating func forgetLastValue() {
@@ -99,6 +105,13 @@ public final class ThrottledSender<Value: Equatable & Sendable> {
         if let value = throttle.finish(value, now: .now) {
             send(value)
         }
+    }
+
+    /// Descarta lo pendiente y el envío programado, sin enviar nada.
+    public func cancel() {
+        timer?.cancel()
+        timer = nil
+        throttle.cancel()
     }
 
     public func forgetLastValue() {

@@ -28,7 +28,7 @@ private struct StatusBanner: View {
     var body: some View {
         switch model.status {
         case .connected:
-            if let error = model.lastError {
+            if let error = model.notice {
                 Label(error.localizedMessage, systemImage: "exclamationmark.triangle")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -66,10 +66,11 @@ private struct StatusBanner: View {
 private struct ChannelStrip: View {
     let scope: Scope
     let model: MixerModel
+    @State private var isChoosingDevice = false
 
     var body: some View {
         let channel = model.channel(scope)
-        let canSetVolume = model.isConnected && (channel?.settable ?? false)
+        let canSetVolume = model.isConnected && (channel?.volumeSettable ?? false)
         let canSetMute = model.isConnected && (channel?.muteSettable ?? false)
         let volume = channel?.volume ?? 0
         let muted = channel?.muted ?? false
@@ -104,20 +105,53 @@ private struct ChannelStrip: View {
             .disabled(!canSetMute)
             .accessibilityLabel(muteLabel(muted: muted))
 
-            Text(channel?.deviceName ?? String(localized: "No device"))
+            Button {
+                isChoosingDevice = true
+            } label: {
+                HStack(spacing: 2) {
+                    Text(channel?.deviceName ?? String(localized: "No device"))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .imageScale(.small)
+                }
                 .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
                 .frame(height: 32, alignment: .top)
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .disabled(!model.isConnected || model.devices(scope).isEmpty)
+            .accessibilityLabel(chooseDeviceLabel)
+            .accessibilityValue(channel?.deviceName ?? String(localized: "No device"))
 
-            if let channel, !channel.settable {
-                Text("This device doesn't allow changing the volume")
+            if let channel, let note = settabilityNote(channel) {
+                Text(note)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
             }
         }
         .frame(maxWidth: .infinity)
+        .sheet(isPresented: $isChoosingDevice) {
+            DevicePickerView(scope: scope, model: model)
+        }
+    }
+
+    /// Cada control se deshabilita por separado; el texto dice cuál no se puede cambiar.
+    private func settabilityNote(_ channel: ChannelState) -> String? {
+        switch (channel.volumeSettable, channel.muteSettable) {
+        case (true, true): nil
+        case (false, true): String(localized: "This device doesn't allow changing the volume")
+        case (true, false): String(localized: "This device doesn't allow muting")
+        case (false, false): String(localized: "This device doesn't allow changing the volume or muting")
+        }
+    }
+
+    private var chooseDeviceLabel: String {
+        switch scope {
+        case .output: String(localized: "Choose output device")
+        case .input: String(localized: "Choose input device")
+        }
     }
 
     private var title: String {

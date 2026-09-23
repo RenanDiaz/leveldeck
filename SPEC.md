@@ -1,7 +1,7 @@
 # SPEC — LevelDeck
 
 > Deriva de `INTENT.md`. Si algo aquí contradice el intent, manda el intent.
-> Estado: borrador v1.5 (Fase 3: emparejamiento por QR, Keychain, TLS-PSK y revocación)
+> Estado: borrador v1.6 (Fase 4: selector de dispositivo, controles no configurables y varios clientes)
 
 ## 1. Resumen
 
@@ -71,18 +71,25 @@ Wrapper sobre CoreAudio, detrás de un protocolo (`AudioControlling`) para poder
 | Capacidad | API de CoreAudio |
 |---|---|
 | Dispositivo de salida/entrada por defecto | `kAudioHardwarePropertyDefaultOutputDevice` / `DefaultInputDevice` (leer y escribir) |
-| Lista de dispositivos | `kAudioHardwarePropertyDevices` y filtrar por streams de salida/entrada (`kAudioDevicePropertyStreams` con el scope correspondiente) |
+| Lista de dispositivos | `kAudioHardwarePropertyDevices`, filtrando por streams en el scope (`kAudioDevicePropertyStreams`) y sin los ocultos (`kAudioDevicePropertyIsHidden`) |
+| UID → dispositivo | `kAudioHardwarePropertyTranslateUIDToDevice` (para `setDefaultDevice`) |
 | Volumen de salida | `kAudioHardwareServiceDeviceProperty_VirtualMainVolume`, scope output |
 | Volumen de entrada | igual con scope input; si no es configurable, usar `kAudioDevicePropertyVolumeScalar` por canal |
 | Mute | `kAudioDevicePropertyMute` |
 | Cambios externos | `AudioObjectAddPropertyListenerBlock` sobre volumen, mute, dispositivo por defecto y lista de dispositivos |
 
+`AudioControlling` expone, por `Scope`: `channel`, `setVolume`, `setMute`, `devices`, `setDefaultDevice` y la observación de cambios.
+
 Reglas:
 
 - El volumen se expresa como `Float` normalizado en el rango 0.0–1.0.
 - Salida y entrada son simétricas: toda la API de `AudioControlling` se parametriza por `Scope`.
-- Antes de exponer un control, verificar con `AudioObjectIsPropertySettable`. Algunos dispositivos (HDMI, ciertas interfaces USB) no permiten cambiar el volumen. En ese caso el control se reporta como `settable: false` y el cliente lo muestra deshabilitado.
-- La configurabilidad del volumen y del mute se evalúa por separado (hay micrófonos con volumen y sin mute, y al revés). Internamente el agente lleva `volumeSettable` y `muteSettable`; el protocolo los expone como `settable` (volumen) y `muteSettable` desde la Fase 2.
+- Antes de exponer un control, verificar con `AudioObjectIsPropertySettable`. Algunos dispositivos (HDMI, ciertas interfaces USB) no permiten cambiar el volumen. En ese caso el control se reporta como no configurable y el cliente lo muestra deshabilitado.
+- La configurabilidad del volumen y del mute se evalúa por separado (hay micrófonos con volumen y sin mute, pantallas con mute y sin volumen). El agente y el protocolo llevan `volumeSettable` y `muteSettable`; cada control se deshabilita por su cuenta, sin afectar al otro.
+- La lista de un scope incluye los dispositivos con al menos un stream en ese scope que no estén ocultos (`kAudioDevicePropertyIsHidden`; si el dispositivo no expone la propiedad, cuenta como visible). Los virtuales (BlackHole, los de Zoom y Teams) aparecen si cumplen eso. Va ordenada por nombre. Un dispositivo oculto no se lista aunque sea el activo: el fader muestra su nombre y el selector no marca ninguno.
+- `setDefaultDevice` traduce el UID con `kAudioHardwarePropertyTranslateUIDToDevice`. UID desconocido, oculto o sin streams en el scope → `deviceNotFound` (p. ej. se desconectó entre que el cliente vio la lista y lo eligió); el agente relee la lista para que el siguiente `state` la corrija. Elegir el que ya está activo no hace nada. Solo se cambia el default de salida o entrada: el de sonidos del sistema (`DefaultSystemOutputDevice`) se deja a macOS.
+- La lista y el canal se leen por separado: si una lectura falla, conserva su último valor y la otra se aplica igual. Al desconectar el activo, la HAL puede fallar un instante al leer el default viejo, y la lista tiene que actualizarse de todas formas.
+- Un cambio en `kAudioHardwarePropertyDevices` (conectar o desconectar audífonos, interfaces o monitores) se avisa para ambos scopes. Si desaparece el activo, el que elija macOS llega por el listener del dispositivo por defecto.
 - Puede no haber dispositivo por defecto para un scope (p. ej. un Mac mini sin micrófono). El agente lo modela como canal ausente y el menú muestra "Sin dispositivo". En el protocolo, el canal va presente con valor `null` (ver §8).
 - Al cambiar el dispositivo por defecto, re-suscribir los listeners al nuevo dispositivo.
 - Cualquier cambio, venga del cliente o de fuera, produce un único evento de estado que se envía a todos los clientes conectados.
@@ -114,14 +121,15 @@ Reglas:
 ### 6.1 Pantallas
 
 1. **Descubrimiento:** lista de Macs encontradas con `NWBrowser`. Las ya emparejadas (el `agentId` del TXT coincide con una entrada del Keychain) se marcan y se conectan automáticamente: la última usada si está, si no la primera. Las no emparejadas ofrecen "Emparejar" y abren la cámara (pantalla de emparejamiento, §7).
-2. **Mixer:** dos faders verticales grandes (Salida, Entrada), cada uno con botón de mute y un indicador del dispositivo activo. Al tocar el nombre del dispositivo se abre un selector.
+2. **Mixer:** dos faders verticales grandes (Salida, Entrada), cada uno con botón de mute y un indicador del dispositivo activo. Al tocar el nombre del dispositivo se abre un selector (sheet con la lista de ese scope y el activo marcado); la lista cambia en vivo mientras está abierto. Elegir uno manda `setDefaultDevice` y cierra el sheet; no hay cambio optimista: el dispositivo nuevo se ve cuando llega el `state`. Un volumen o mute no configurable se muestra deshabilitado, con una nota que dice cuál. Los errores del agente se muestran como aviso transitorio (unos segundos): el mixer ya se resincronizó con el último `state`.
 3. **Ajustes:** Macs emparejadas (con fecha y opción de olvidar, que borra la clave del iPhone), versión y protocolo. Olvidar en el iPhone no revoca en la Mac: la Mac sigue listando el dispositivo hasta que se revoque desde su menú.
 
 ### 6.2 Comportamiento del fader
 
 Las dos primeras reglas se implementan desde la Fase 2 (`SendThrottle`, `EchoGate` y `MixerState` en `LevelDeckKit/Sync`).
 
-- Mientras el usuario arrastra, el cliente es la fuente de verdad: los eventos de estado entrantes para ese control se ignoran hasta ~300 ms después de soltar. Esto evita saltos. Solo se retiene el volumen de ese fader: el resto del `state` (mute, nombre, configurabilidad, el otro canal) se aplica igual. Al vencer la ventana se aplica el último volumen recibido durante ella, para no quedar desincronizado. Si cambia el dispositivo por defecto a mitad del arrastre, manda el agente.
+- Mientras el usuario arrastra, el cliente es la fuente de verdad: los eventos de estado entrantes para ese control se ignoran hasta ~300 ms después de soltar. Esto evita saltos, también cuando otro cliente mueve el mismo control. Solo se retiene el volumen de ese fader: el resto del `state` (mute, nombre, configurabilidad, lista de dispositivos, el otro canal) se aplica igual. Al vencer la ventana se aplica el último volumen recibido durante ella, para no quedar desincronizado.
+- Si cambia el dispositivo por defecto a mitad del arrastre (o durante la retención), manda el agente y el arrastre queda invalidado: el cliente descarta el envío pendiente y no manda más `setVolume` hasta el próximo toque. Si no, seguiría escribiendo en el dispositivo nuevo (p. ej. otro cliente cambió a audífonos y este los pondría a 100 %).
 - Los envíos se limitan a un máximo de 30 por segundo y siempre se envía el valor final al soltar. El primer valor sale de inmediato; los intermedios se agrupan y sale el más reciente.
 - Feedback háptico ligero en 0 %, en 100 % y al activar o desactivar el mute.
 - Si la conexión se pierde, los faders se muestran deshabilitados con un indicador de "Reconectando…" y el cliente reintenta con backoff (1 s, 2 s, 4 s, con máximo de 10 s).
@@ -174,7 +182,7 @@ La clave nunca viaja por la red: el QR es el canal fuera de banda. La Mac guarda
 
 ## 8. Protocolo
 
-Mensajes JSON sobre WebSocket. Todos incluyen `type` y el payload va plano, al mismo nivel que `type`. El protocolo tiene versión (`v: 1`), que solo viaja en `hello` y `state`: el handshake la negocia, y los comandos no la repiten.
+Mensajes JSON sobre WebSocket. Todos incluyen `type` y el payload va plano, al mismo nivel que `type`. El protocolo tiene versión (`v: 2` desde la Fase 4, que cambió `settable` por `volumeSettable`), que solo viaja en `hello` y `state`: el handshake la negocia, y los comandos no la repiten.
 
 ### Cliente → Agente
 
@@ -183,7 +191,7 @@ Mensajes JSON sobre WebSocket. Todos incluyen `type` y el payload va plano, al m
 | `hello` | `{ v, deviceName, deviceId }` | Primer mensaje. `deviceId` es la identidad PSK que la Mac asignó al emparejar (§7); solo se omite con el transporte en claro de desarrollo. El agente responde con `state`; con `error` `unsupportedVersion` y cierra si `v` no coincide; con `error` `notPaired` y cierra si `deviceId` falta o no está emparejado ni pendiente. Cualquier otro mensaje antes de `hello` cierra la conexión. |
 | `setVolume` | `{ scope: "output"\|"input", value: 0.0–1.0 }` | Cambia el volumen del dispositivo por defecto. |
 | `setMute` | `{ scope, muted: Bool }` | Cambia el mute. |
-| `setDefaultDevice` | `{ scope, deviceId: String }` | Cambia el dispositivo por defecto. |
+| `setDefaultDevice` | `{ scope, deviceId: String }` | Cambia el dispositivo por defecto del scope. `deviceId` es un UID de `devices`. Si ya no está disponible, `error` `deviceNotFound`. Elegir el activo no hace nada. |
 
 ### Agente → Cliente
 
@@ -195,11 +203,11 @@ Mensajes JSON sobre WebSocket. Todos incluyen `type` y el payload va plano, al m
 ```json
 {
   "type": "state",
-  "v": 1,
+  "v": 2,
   "output": { "deviceId": "…", "deviceName": "MacBook Pro Speakers",
-              "volume": 0.62, "muted": false, "settable": true, "muteSettable": true },
+              "volume": 0.62, "muted": false, "volumeSettable": true, "muteSettable": true },
   "input":  { "deviceId": "…", "deviceName": "MacBook Pro Microphone",
-              "volume": 0.80, "muted": false, "settable": true, "muteSettable": true },
+              "volume": 0.80, "muted": false, "volumeSettable": true, "muteSettable": true },
   "devices": {
     "output": [{ "id": "…", "name": "…" }],
     "input":  [{ "id": "…", "name": "…" }]
@@ -207,15 +215,17 @@ Mensajes JSON sobre WebSocket. Todos incluyen `type` y el payload va plano, al m
 }
 ```
 
-`settable` indica si se puede cambiar el volumen y `muteSettable` si se puede cambiar el mute; el cliente deshabilita cada control por separado.
+`volumeSettable` indica si se puede cambiar el volumen y `muteSettable` si se puede cambiar el mute; son independientes y el cliente deshabilita cada control por separado. Un canal con la clave `settable` de la v1 no se decodifica.
 
-Si no hay dispositivo por defecto para un scope, su clave va presente con valor `null` (`"input": null`). Omitir la clave es un error de decodificación, igual que cualquier otro campo faltante. Hasta la Fase 4, `devices` viaja con listas vacías.
+Si no hay dispositivo por defecto para un scope, su clave va presente con valor `null` (`"input": null`). Omitir la clave es un error de decodificación, igual que cualquier otro campo faltante.
+
+`devices` trae, por scope, los dispositivos que se pueden elegir (§5.2), ordenados por nombre. El activo se reconoce por `deviceId`. La lista se actualiza en todos los clientes al conectar o desconectar dispositivos.
 
 El `deviceId` es el UID del dispositivo (`kAudioDevicePropertyDeviceUID`), no el `AudioObjectID`, porque el UID es estable entre reinicios.
 
 Un `setVolume` con `value` fuera de 0.0–1.0 (o `NaN`) es inválido: no se recorta. `LevelDeckKit` se niega a codificarlo y lo rechaza al decodificar, y el agente responde `error` con `invalidValue`. Un `type` desconocido o un campo faltante también son errores de decodificación y también se responden con `invalidValue`; la conexión sigue abierta.
 
-Hasta la Fase 4, `setDefaultDevice` se responde con `notSettable`.
+Un `error` va solo al cliente que mandó el comando. El `state` que resulta de un comando va a todos, así que lo que hace un cliente se refleja en los demás.
 
 Se envía siempre el snapshot completo, no diffs. El payload es pequeño y así se evita todo un tipo de bugs de sincronización. Los envíos de `state` se agrupan (coalescing) a un máximo de 30 por segundo, siempre con el último estado, y no se reenvía un snapshot idéntico al anterior: así cada cambio produce un único evento aunque llegue por varias vías (el comando del cliente y el listener de CoreAudio).
 
@@ -251,8 +261,16 @@ Cada fase termina con algo que se puede usar y probar.
 - los tres criterios se prueban con tests de integración en loopback (`PairingIntegrationTests`) que pasan en CI, junto con el vencimiento y la cancelación del QR y la supervivencia de las sesiones activas al reiniciar el listener;
 - verificación manual en iPhone físico (permiso de cámara, escaneo, reconexión tras reabrir la app, revocación con la app abierta), con checklist en el PR.
 
-**Fase 4 — Mixer completo.** Selector de dispositivo (`devices` y `setDefaultDevice`), manejo completo de `settable: false` en el cliente y pruebas con varios clientes simultáneos. (El mute en el cliente y `muteSettable` se adelantaron a la Fase 2.)
-*Listo cuando:* los dos faders y el selector funcionan, y conectar un monitor HDMI sin control de volumen deshabilita el fader sin romper nada.
+**Fase 4 — Mixer completo.** Selector de dispositivo (`devices` y `setDefaultDevice`), manejo de controles no configurables en el cliente y varios clientes simultáneos. Ajuste de protocolo: `settable` pasa a `volumeSettable` y la versión sube a `v: 2`. (El mute en el cliente y `muteSettable` se adelantaron a la Fase 2.) Textos nuevos en inglés y español.
+*Listo cuando:*
+- tocar el nombre del dispositivo en el iPhone abre un selector con los dispositivos de ese scope y el activo marcado; elegir uno lo vuelve el dispositivo por defecto de la Mac;
+- la lista se actualiza en vivo en todos los clientes al conectar o desconectar audífonos, interfaces USB o monitores; si desaparece el activo, los clientes reflejan el que elija macOS;
+- no se muestran los dispositivos ocultos; los virtuales (BlackHole, Zoom, Teams) sí, si tienen streams en ese scope;
+- un control no configurable se muestra deshabilitado sin afectar al otro (un dispositivo con mute y sin volumen mantiene el mute usable); conectar un monitor HDMI sin control de volumen deshabilita el fader sin romper nada;
+- elegir un dispositivo que desapareció entre la lista y el toque responde `deviceNotFound` y el cliente se recupera solo;
+- con varios clientes, lo que hace uno se refleja en los demás, y el que arrastra un fader no se ve afectado por los otros;
+- la lógica de dispositivos se prueba con el mock de `AudioControlling` (conexión y desconexión en caliente, activo que desaparece, flags independientes) y un test de integración con dos clientes en loopback, y pasan en CI;
+- verificación manual con hardware real, con checklist en el PR.
 
 **Fase 5 — Pulido.** Reconexión con backoff, hápticos, login item y opción de desactivarlo. (La supresión de eco y el throttle se adelantaron a la Fase 2.)
 *Listo cuando:* dormir y despertar la Mac, o apagar y encender el Wi-Fi del iPhone, recupera la conexión sin intervención.
@@ -267,8 +285,8 @@ Cada fase termina con algo que se puede usar y probar.
 ## 11. Pruebas
 
 - **LevelDeckKit:** tests unitarios de codificación del protocolo, formato del QR (`PairingCode`, `PresharedKey`), política del `hello` en `PairingManager` (pendiente, conocido, desconocido, fallo del store) y lógica de throttle y coalescing.
-- **AudioController:** detrás de `AudioControlling`. Tests con mock para la lógica de estado y una verificación manual contra el hardware real (CoreAudio no se puede mockear de forma útil a bajo nivel).
-- **Integración:** tests que levantan el servidor de `LevelDeckKit` en loopback con TLS-PSK. `LoopbackIntegrationTests` verifica el ciclo completo `hello` → `setVolume` → `state`, `setMute`, errores y dos clientes con claves distintas a la vez (claves fijas de prueba, sin `authorizer`). `PairingIntegrationTests` cubre la Fase 3 con `PairingManager` y un store en memoria: dispositivo emparejado conecta y reconecta, identidad desconocida y clave incorrecta se rechazan en el handshake, `hello` sin `deviceId` se rechaza, dispositivo revocado pierde la conexión activa y no vuelve, el QR cancelado o vencido no sirve, y una sesión activa sobrevive al reinicio del listener. `PlaintextSmokeTests` mantiene vivo el transporte en claro de Debug.
+- **AudioController:** detrás de `AudioControlling`. Tests con mock para la lógica de estado (incluida la de dispositivos: conexión y desconexión en caliente, activo que desaparece, dispositivo que desaparece antes del toque, errores de lectura de la lista y flags independientes) y una verificación manual contra el hardware real (CoreAudio no se puede mockear de forma útil a bajo nivel; el filtro de ocultos y de streams se verifica ahí).
+- **Integración:** tests que levantan el servidor de `LevelDeckKit` en loopback con TLS-PSK. `LoopbackIntegrationTests` verifica el ciclo completo `hello` → `setVolume` → `state`, `setMute`, errores y dos clientes con claves distintas a la vez (claves fijas de prueba, sin `authorizer`). Desde la Fase 4, con dos clientes: la lista y la selección de dispositivo llegan a ambos, el activo que desaparece también, `deviceNotFound` solo le llega a quien lo pidió, y el que arrastra (con su `MixerState`) no se mueve por los cambios del otro y queda invalidado si el otro cambia de dispositivo. `PairingIntegrationTests` cubre la Fase 3 con `PairingManager` y un store en memoria: dispositivo emparejado conecta y reconecta, identidad desconocida y clave incorrecta se rechazan en el handshake, `hello` sin `deviceId` se rechaza, dispositivo revocado pierde la conexión activa y no vuelve, el QR cancelado o vencido no sirve, y una sesión activa sobrevive al reinicio del listener. `PlaintextSmokeTests` mantiene vivo el transporte en claro de Debug.
 - **Checklist manual por fase,** basado en los criterios de "Listo cuando".
 
 ## 12. Distribución

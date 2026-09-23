@@ -27,9 +27,9 @@ struct AudioServerBridgeTests {
     @Test func stateExposesVolumeAndMuteSettableSeparately() {
         let (_, _, bridge) = makeBridge([.output: .hdmi, .input: .usbInterface])
         let state = bridge.currentState()
-        #expect(state.output?.settable == false)
+        #expect(state.output?.volumeSettable == false)
         #expect(state.output?.muteSettable == false)
-        #expect(state.input?.settable == true)
+        #expect(state.input?.volumeSettable == true)
         #expect(state.input?.muteSettable == false)
     }
 
@@ -77,9 +77,46 @@ struct AudioServerBridgeTests {
         #expect(bridge.handle(.setVolume(scope: .output, value: 0.5))?.code == .notSettable)
     }
 
-    @Test func setDefaultDeviceIsNotAvailableYet() {
-        let (_, _, bridge) = makeBridge()
-        #expect(bridge.handle(.setDefaultDevice(scope: .output, deviceId: "x"))?.code == .notSettable)
+    @Test func stateCarriesDeviceLists() {
+        let (mock, _, bridge) = makeBridge()
+        mock.simulatePlug(.headset)
+        let devices = bridge.currentState().devices
+        #expect(devices.output.map(\.id) == ["BluetoothHeadset", "BuiltInSpeakerDevice"])
+        #expect(devices.input.map(\.id) == ["BluetoothHeadset", "BuiltInMicrophoneDevice"])
+        #expect(devices.output.first?.name == "AirPods Pro")
+    }
+
+    @Test func setDefaultDeviceApplies() {
+        let (mock, _, bridge) = makeBridge()
+        mock.simulatePlug(.hdmi)
+        #expect(bridge.handle(.setDefaultDevice(scope: .output, deviceId: "HDMIDisplay")) == nil)
+        let output = bridge.currentState().output
+        #expect(output?.deviceId == "HDMIDisplay")
+        #expect(output?.volumeSettable == false)
+        #expect(output?.muteSettable == false)
+    }
+
+    @Test func setDefaultDeviceToMissingDeviceIsDeviceNotFound() {
+        let (mock, _, bridge) = makeBridge()
+        #expect(bridge.handle(.setDefaultDevice(scope: .output, deviceId: "x"))?.code == .deviceNotFound)
+        #expect(mock.system[.output] == .speakers)
+    }
+
+    @Test func setDefaultDeviceGoneBeforeTheTapResyncsTheState() {
+        let (mock, _, bridge) = makeBridge()
+        mock.simulatePlug(.hdmi)
+        mock.removeWithoutNotifying("HDMIDisplay")
+        #expect(bridge.handle(.setDefaultDevice(scope: .output, deviceId: "HDMIDisplay"))?.code == .deviceNotFound)
+        #expect(bridge.currentState().devices.output.map(\.id) == ["BuiltInSpeakerDevice"])
+    }
+
+    @Test func muteOnlyDeviceAcceptsMuteAndRejectsVolume() {
+        let (mock, _, bridge) = makeBridge([.output: .displayMuteOnly])
+        #expect(bridge.handle(.setVolume(scope: .output, value: 0.5))?.code == .notSettable)
+        #expect(bridge.handle(.setMute(scope: .output, muted: true)) == nil)
+        #expect(mock.system[.output]?.muted == true)
+        #expect(bridge.currentState().output?.volumeSettable == false)
+        #expect(bridge.currentState().output?.muteSettable == true)
     }
 
     @Test func successAfterErrorReportsNoError() {

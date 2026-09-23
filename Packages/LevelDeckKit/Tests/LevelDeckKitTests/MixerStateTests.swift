@@ -119,6 +119,91 @@ struct MixerStateTests {
         #expect(mixer[.output]?.volume == 0.2)
     }
 
+    /// Otro cliente cambia el dispositivo mientras este arrastra: el arrastre deja de valer
+    /// hasta el próximo toque, para no pisar el volumen del dispositivo nuevo.
+    @Test func deviceChangeDuringDragInvalidatesTheDrag() {
+        var mixer = MixerState()
+        mixer.apply(snapshot(output: 0.5), now: at(0))
+        mixer.beginDrag(.output)
+        mixer.drag(.output, to: 0.9)
+        #expect(mixer.acceptsDrag(.output))
+
+        var next = snapshot(output: 0.2)
+        next.output?.deviceId = "Headphones"
+        mixer.apply(next, now: at(10))
+        #expect(!mixer.acceptsDrag(.output))
+        #expect(!mixer.isInteracting(.output))
+
+        mixer.drag(.output, to: 1)
+        #expect(mixer[.output]?.volume == 0.2, "Los valores del arrastre invalidado no se muestran")
+        #expect(mixer.endDrag(.output, at: 1, now: at(20)) == nil)
+        #expect(mixer[.output]?.volume == 0.2)
+
+        // Un `state` posterior se aplica directo: no queda retención.
+        var later = next
+        later.output?.volume = 0.3
+        mixer.apply(later, now: at(30))
+        #expect(mixer[.output]?.volume == 0.3)
+
+        mixer.beginDrag(.output)
+        #expect(mixer.acceptsDrag(.output))
+        mixer.drag(.output, to: 0.7)
+        #expect(mixer[.output]?.volume == 0.7)
+    }
+
+    @Test func deviceChangeDuringHoldInvalidatesTheDrag() {
+        var mixer = MixerState()
+        mixer.apply(snapshot(output: 0.5), now: at(0))
+        mixer.beginDrag(.output)
+        _ = mixer.endDrag(.output, at: 0.8, now: at(10))
+        var next = snapshot(output: 0.2)
+        next.output?.deviceId = "Headphones"
+        mixer.apply(next, now: at(20))
+        #expect(mixer[.output]?.volume == 0.2)
+        mixer.settle(.output, now: at(400))
+        #expect(mixer[.output]?.volume == 0.2)
+    }
+
+    @Test func deviceDisappearingDuringDragInvalidatesTheDrag() {
+        var mixer = MixerState()
+        mixer.apply(Fixtures.snapshot, now: at(0))
+        mixer.beginDrag(.input)
+        var next = Fixtures.snapshot
+        next.input = nil
+        mixer.apply(next, now: at(10))
+        #expect(!mixer.acceptsDrag(.input))
+    }
+
+    @Test func sameDeviceDuringDragKeepsTheDrag() {
+        var mixer = MixerState()
+        mixer.apply(snapshot(output: 0.5), now: at(0))
+        mixer.beginDrag(.output)
+        mixer.apply(snapshot(output: 0.1), now: at(10))
+        #expect(mixer.acceptsDrag(.output))
+    }
+
+    @Test func draggingTheOtherScopeIsUnaffectedByDeviceChange() {
+        var mixer = MixerState()
+        mixer.apply(Fixtures.snapshot, now: at(0))
+        mixer.beginDrag(.input)
+        var next = Fixtures.snapshot
+        next.output?.deviceId = "Headphones"
+        mixer.apply(next, now: at(10))
+        #expect(mixer.acceptsDrag(.input))
+        #expect(mixer.acceptsDrag(.output))
+    }
+
+    @Test func devicesAreAppliedEvenWhileDragging() {
+        var mixer = MixerState()
+        mixer.apply(Fixtures.snapshot, now: at(0))
+        #expect(mixer.devices == Fixtures.snapshot.devices)
+        mixer.beginDrag(.output)
+        var next = Fixtures.snapshot
+        next.devices.output.append(DeviceInfo(id: "Headphones", name: "AirPods Pro"))
+        mixer.apply(next, now: at(10))
+        #expect(mixer.devices.output.map(\.id) == ["BuiltInSpeakerDevice", "Headphones"])
+    }
+
     @Test func absentChannelIsRemoved() {
         var mixer = MixerState()
         mixer.apply(Fixtures.snapshot, now: at(0))

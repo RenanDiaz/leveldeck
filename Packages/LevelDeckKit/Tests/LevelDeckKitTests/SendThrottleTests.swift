@@ -42,6 +42,15 @@ struct SendThrottleTests {
         #expect(throttle.finish(0.4, now: at(50)) == nil)
     }
 
+    @Test func cancelDropsPendingWithoutSending() {
+        var throttle = SendThrottle<Float>(interval: interval)
+        _ = throttle.submit(0.1, now: at(0))
+        _ = throttle.submit(0.2, now: at(5))
+        throttle.cancel()
+        #expect(throttle.fire(now: at(30)) == nil)
+        #expect(throttle.pending == nil)
+    }
+
     @Test func forgetLastValueResendsSameValue() {
         var throttle = SendThrottle<Float>(interval: interval)
         _ = throttle.submit(0, now: at(0))
@@ -112,5 +121,15 @@ struct ThrottledSenderTests {
         sender.finish(5)
         try await Task.sleep(for: .milliseconds(100))
         #expect(sent.values == [1, 5])
+    }
+
+    @Test func cancelDropsTheScheduledSend() async throws {
+        let sent = Sent()
+        let sender = ThrottledSender<Int>(interval: .milliseconds(20)) { sent.values.append($0) }
+        sender.submit(1)
+        sender.submit(2)
+        sender.cancel()
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(sent.values == [1])
     }
 }

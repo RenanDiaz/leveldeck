@@ -63,6 +63,65 @@ enum HAL {
         return device == AudioObjectID(kAudioObjectUnknown) ? nil : device
     }
 
+    /// Todos los dispositivos de la HAL, sin filtrar (`kAudioHardwarePropertyDevices`).
+    static func allDevices() throws(AudioControlError) -> [AudioObjectID] {
+        try array(systemObject, address(kAudioHardwarePropertyDevices))
+    }
+
+    /// `true` si el dispositivo tiene al menos un stream en el scope.
+    static func hasStreams(_ device: AudioObjectID, _ scope: Scope) -> Bool {
+        var streams = address(kAudioDevicePropertyStreams, scope: scope.halScope)
+        var size: UInt32 = 0
+        return AudioObjectGetPropertyDataSize(device, &streams, 0, nil, &size) == noErr && size > 0
+    }
+
+    /// `kAudioDevicePropertyIsHidden`. Si el dispositivo no la expone, se toma como visible.
+    static func isHidden(_ device: AudioObjectID) -> Bool {
+        let hidden = address(kAudioDevicePropertyIsHidden)
+        guard has(device, hidden) else { return false }
+        return ((try? get(device, hidden, initial: UInt32(0))) ?? 0) != 0
+    }
+
+    /// Dispositivo con ese UID, o `nil` si no existe (`kAudioHardwarePropertyTranslateUIDToDevice`).
+    static func device(forUID uid: String) throws(AudioControlError) -> AudioObjectID? {
+        var translate = address(kAudioHardwarePropertyTranslateUIDToDevice)
+        // El calificador es el UID como `CFString`; Swift mantiene la referencia viva.
+        var qualifier = uid as CFString
+        var device = AudioObjectID(kAudioObjectUnknown)
+        var size = UInt32(MemoryLayout<AudioObjectID>.size)
+        let status = withUnsafeMutablePointer(to: &qualifier) { qualifierPointer in
+            AudioObjectGetPropertyData(
+                systemObject, &translate,
+                UInt32(MemoryLayout<CFString>.size), qualifierPointer,
+                &size, &device
+            )
+        }
+        guard status == noErr else { throw .coreAudio(status: status) }
+        return device == AudioObjectID(kAudioObjectUnknown) ? nil : device
+    }
+
+    static func setDefaultDevice(_ device: AudioObjectID, _ scope: Scope) throws(AudioControlError) {
+        try set(systemObject, address(scope.defaultDeviceSelector), device)
+    }
+
+    /// Propiedad de tamaño variable con elementos de tipo `T`.
+    private static func array<T>(
+        _ object: AudioObjectID, _ address: AudioObjectPropertyAddress
+    ) throws(AudioControlError) -> [T] {
+        var address = address
+        var size: UInt32 = 0
+        var status = AudioObjectGetPropertyDataSize(object, &address, 0, nil, &size)
+        guard status == noErr else { throw .coreAudio(status: status) }
+        let count = Int(size) / MemoryLayout<T>.stride
+        guard count > 0 else { return [] }
+        let buffer = UnsafeMutablePointer<T>.allocate(capacity: count)
+        defer { buffer.deallocate() }
+        status = AudioObjectGetPropertyData(object, &address, 0, nil, &size, buffer)
+        guard status == noErr else { throw .coreAudio(status: status) }
+        // La lista pudo encogerse entre las dos llamadas: `size` trae lo que se escribió.
+        return Array(UnsafeBufferPointer(start: buffer, count: Int(size) / MemoryLayout<T>.stride))
+    }
+
     /// Número total de canales del dispositivo en el scope, según su configuración de streams.
     static func channelCount(_ device: AudioObjectID, _ scope: Scope) -> Int {
         var streams = address(kAudioDevicePropertyStreamConfiguration, scope: scope.halScope)

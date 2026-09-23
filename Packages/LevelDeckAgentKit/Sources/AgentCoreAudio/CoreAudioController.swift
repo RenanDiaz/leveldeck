@@ -8,7 +8,9 @@ import LevelDeckKit
 ///
 /// Los listeners se registran en la cola principal, así que `onChange` siempre se entrega
 /// en el main actor. Al cambiar el dispositivo por defecto de un scope, los listeners de
-/// ese scope se mueven al dispositivo nuevo.
+/// ese scope se mueven al dispositivo nuevo. Un cambio en la lista de dispositivos (conectar
+/// o desconectar algo) se avisa para ambos scopes; si desaparece el activo, el dispositivo
+/// que elija macOS llega por el listener del default.
 @MainActor
 public final class CoreAudioController: AudioControlling {
     private struct Listener {
@@ -64,12 +66,44 @@ public final class CoreAudioController: AudioControlling {
         try HAL.set(device, mute, UInt32(muted ? 1 : 0))
     }
 
+    public func devices(_ scope: Scope) throws(AudioControlError) -> [DeviceInfo] {
+        var devices: [DeviceInfo] = []
+        for device in try HAL.allDevices() where Self.isSelectable(device, scope) {
+            // Un dispositivo que desaparece a mitad de la lectura se salta; el listener de la
+            // lista avisa de nuevo enseguida.
+            guard let uid = try? HAL.string(device, kAudioDevicePropertyDeviceUID),
+                  let name = try? HAL.string(device, kAudioObjectPropertyName) else { continue }
+            devices.append(DeviceInfo(id: uid, name: name))
+        }
+        return devices.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    public func setDefaultDevice(_ deviceId: String, scope: Scope) throws(AudioControlError) {
+        guard let device = try HAL.device(forUID: deviceId), Self.isSelectable(device, scope) else {
+            throw .deviceNotFound(scope)
+        }
+        try HAL.setDefaultDevice(device, scope)
+    }
+
+    /// Visible y con streams en el scope (SPEC §5.2). Los virtuales (BlackHole, Zoom, Teams)
+    /// pasan si cumplen eso.
+    private static func isSelectable(_ device: AudioObjectID, _ scope: Scope) -> Bool {
+        HAL.hasStreams(device, scope) && !HAL.isHidden(device)
+    }
+
     public func startObserving(_ onChange: @escaping @MainActor (Scope) -> Void) {
         stopObserving()
         self.onChange = onChange
+        // La lista de dispositivos es del sistema y afecta a ambos scopes.
+        if let listener = addListener(
+            HAL.systemObject, HAL.address(kAudioHardwarePropertyDevices),
+            scopes: Scope.allCases, defaultDeviceChanged: false
+        ) {
+            systemListeners.append(listener)
+        }
         for scope in Scope.allCases {
             let defaultDevice = HAL.address(scope.defaultDeviceSelector)
-            if let listener = addListener(HAL.systemObject, defaultDevice, scope: scope, defaultDeviceChanged: true) {
+            if let listener = addListener(HAL.systemObject, defaultDevice, scopes: [scope], defaultDeviceChanged: true) {
                 systemListeners.append(listener)
             }
             subscribeToDefaultDevice(scope)
@@ -89,12 +123,14 @@ public final class CoreAudioController: AudioControlling {
 
     // MARK: - Listeners
 
-    private func handleChange(_ scope: Scope, defaultDeviceChanged: Bool, listener: UInt64) {
+    private func handleChange(_ scopes: [Scope], defaultDeviceChanged: Bool, listener: UInt64) {
         guard onChange != nil, activeListeners.contains(listener) else { return }
-        if defaultDeviceChanged {
-            subscribeToDefaultDevice(scope)
+        for scope in scopes {
+            if defaultDeviceChanged {
+                subscribeToDefaultDevice(scope)
+            }
+            onChange?(scope)
         }
-        onChange?(scope)
     }
 
     /// Escucha volumen y mute del dispositivo por defecto actual del scope.
@@ -104,7 +140,7 @@ public final class CoreAudioController: AudioControlling {
         let mute = HAL.address(kAudioDevicePropertyMute, scope: scope.halScope)
         let addresses = VolumeControl.resolve(device, scope).addresses + (HAL.has(device, mute) ? [mute] : [])
         deviceListeners[scope] = addresses.compactMap {
-            addListener(device, $0, scope: scope, defaultDeviceChanged: false)
+            addListener(device, $0, scopes: [scope], defaultDeviceChanged: false)
         }
     }
 
@@ -117,13 +153,13 @@ public final class CoreAudioController: AudioControlling {
 
     private func addListener(
         _ object: AudioObjectID, _ address: AudioObjectPropertyAddress,
-        scope: Scope, defaultDeviceChanged: Bool
+        scopes: [Scope], defaultDeviceChanged: Bool
     ) -> Listener? {
         nextListenerID += 1
         let id = nextListenerID
         let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
             MainActor.assumeIsolated {
-                self?.handleChange(scope, defaultDeviceChanged: defaultDeviceChanged, listener: id)
+                self?.handleChange(scopes, defaultDeviceChanged: defaultDeviceChanged, listener: id)
             }
         }
         var address = address
