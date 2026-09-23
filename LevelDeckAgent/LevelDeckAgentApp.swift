@@ -14,8 +14,12 @@ struct LevelDeckAgentApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra("LevelDeck", systemImage: "slider.vertical.3") {
+        MenuBarExtra {
             MenuContent(audio: audio)
+        } label: {
+            // Template image: macOS lo tiñe según el modo claro/oscuro de la barra.
+            Image("MenuBarIcon")
+                .accessibilityLabel("LevelDeck")
         }
         // El estilo menú no admite sliders (SPEC §5.1).
         .menuBarExtraStyle(.window)
