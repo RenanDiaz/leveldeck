@@ -49,4 +49,7 @@ check_insecure_transport "$PRODUCTS/Debug-iphonesimulator/LevelDeck.app" Debug y
 check_insecure_transport "$PRODUCTS/Release/LevelDeckAgent.app" Release no
 check_insecure_transport "$PRODUCTS/Release-iphonesimulator/LevelDeck.app" Release no
 
+echo "==> Localización: textos de las apps traducidos al español"
+python3 scripts/check-localizations.py
+
 echo "==> Todo OK"

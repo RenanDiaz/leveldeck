@@ -7,9 +7,9 @@ struct ContentView: View {
             DiscoveryView(security: security)
         } else {
             ContentUnavailableView(
-                "Conexión no disponible",
+                "Connection unavailable",
                 systemImage: "lock",
-                description: Text("Este build no incluye transporte seguro todavía (Fase 3). Protocolo v\(ProtocolVersion.current).")
+                description: Text("This build doesn't include secure transport yet (phase 3). Protocol v\(ProtocolVersion.current).")
             )
         }
     }

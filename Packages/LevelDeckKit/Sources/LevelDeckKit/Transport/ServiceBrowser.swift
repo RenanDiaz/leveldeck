@@ -16,8 +16,8 @@ public final class ServiceBrowser {
         case idle
         case browsing
         /// En iOS, típicamente el permiso de red local denegado.
-        case waiting(String)
-        case failed(String)
+        case waiting(NetworkIssue)
+        case failed(NetworkIssue)
     }
 
     public private(set) var agents: [Agent] = []
@@ -56,11 +56,11 @@ public final class ServiceBrowser {
         case .ready:
             status = .browsing
         case let .waiting(error):
-            status = .waiting(error.localizedDescription)
+            status = .waiting(NetworkIssue(error))
         case let .failed(error):
             browser?.cancel()
             browser = nil
-            status = .failed(error.localizedDescription)
+            status = .failed(NetworkIssue(error))
         default:
             break
         }

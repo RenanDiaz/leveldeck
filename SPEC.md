@@ -1,7 +1,7 @@
 # SPEC — LevelDeck
 
 > Deriva de `INTENT.md`. Si algo aquí contradice el intent, manda el intent.
-> Estado: borrador v1.3 (Fase 2 con salida y entrada, mute, `muteSettable`, throttle y supresión de eco)
+> Estado: borrador v1.4 (Fase 2 con salida y entrada, mute, `muteSettable`, throttle, supresión de eco y localización en/es)
 
 ## 1. Resumen
 
@@ -26,6 +26,10 @@ Sin servidores externos, sin cuentas y sin dependencias de terceros.
 - macOS 14+ e iOS 17+ (permite usar el framework Observation y APIs modernas de SwiftUI).
 - Swift 5.10+ o Swift 6 con concurrencia estricta.
 - Sin dependencias externas: solo CoreAudio, Network, Security, SwiftUI, AVFoundation (cámara para el QR) y ServiceManagement.
+- Idiomas: inglés (idioma de desarrollo y de respaldo) y español, en ambas apps, con String Catalogs (`Localizable.xcstrings` e `InfoPlist.xcstrings` por target). Reglas:
+  - `LevelDeckKit` no genera textos de interfaz. Expone problemas tipados (`NetworkIssue` para la red, `ErrorCode` del protocolo) y cada app arma su mensaje localizado.
+  - Nunca se muestra el `localizedDescription` de un error del sistema (mezcla una frase localizada con detalle técnico en inglés) ni el `message` de un `error` del protocolo. El detalle técnico solo aparece en builds Debug, sin traducir y marcado como tal.
+  - `scripts/check-localizations.py` (parte de `verify.sh`) falla si un texto que el compilador extrae de las apps no tiene traducción al español, o si los bundles no incluyen `es.lproj`.
 
 ## 4. Estructura del repositorio
 
@@ -151,7 +155,7 @@ Mensajes JSON sobre WebSocket. Todos incluyen `type` y el payload va plano, al m
 | type | payload |
 |---|---|
 | `state` | Snapshot completo (ver abajo). Se envía tras `hello` y ante cualquier cambio. |
-| `error` | `{ code, message }`. Códigos: `unsupportedVersion`, `notSettable`, `deviceNotFound`, `invalidValue`. |
+| `error` | `{ code, message }`. Códigos: `unsupportedVersion`, `notSettable`, `deviceNotFound`, `invalidValue`. `message` es solo para diagnóstico y no se localiza; el cliente muestra un texto localizado según `code`. |
 
 ```json
 {

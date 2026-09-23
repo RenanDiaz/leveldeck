@@ -12,10 +12,11 @@ public final class LevelDeckClient {
         case idle
         case connecting
         /// La conexión no avanza; en iOS suele ser el permiso de red local denegado.
-        case waiting(String)
+        case waiting(NetworkIssue)
         /// Llegó el primer `state` tras el `hello`.
         case connected
-        case disconnected(String?)
+        /// `nil` si se desconectó sin error (p. ej. el agente cerró la sesión).
+        case disconnected(NetworkIssue?)
     }
 
     public private(set) var status: Status = .idle
@@ -93,7 +94,7 @@ public final class LevelDeckClient {
 
     private func open(_ target: NWEndpoint, id: UUID) {
         guard let url = Self.webSocketURL(for: target) else {
-            status = .disconnected("No se puede conectar a \(target).")
+            status = .disconnected(NetworkIssue(.other, detail: "Endpoint sin URL de WebSocket: \(target)"))
             return
         }
         let connection = MessageConnection<AgentMessage, ClientMessage>(
@@ -129,15 +130,15 @@ public final class LevelDeckClient {
             if let remote {
                 open(remote, id: id)
             } else {
-                status = .disconnected("No se pudo resolver la dirección del agente.")
+                status = .disconnected(NetworkIssue(.unresolved, detail: "Sin remoteEndpoint tras resolver"))
             }
         case let .waiting(error):
-            status = .waiting(error.localizedDescription)
+            status = .waiting(NetworkIssue(error))
         case let .failed(error):
             resolver.cancel()
             self.resolver = nil
             connectionID = nil
-            status = .disconnected(error.localizedDescription)
+            status = .disconnected(NetworkIssue(error))
         default:
             break
         }
@@ -173,11 +174,11 @@ public final class LevelDeckClient {
         case .ready:
             connection?.send(.hello(deviceName: deviceName, version: helloVersion))
         case let .waiting(error):
-            status = .waiting(error.localizedDescription)
+            status = .waiting(NetworkIssue(error))
         case let .closed(error):
             connection = nil
             connectionID = nil
-            status = .disconnected(error?.localizedDescription)
+            status = .disconnected(error.map { NetworkIssue($0) })
         case .message(.failure):
             // Un mensaje del agente que no entendemos no rompe la sesión.
             break

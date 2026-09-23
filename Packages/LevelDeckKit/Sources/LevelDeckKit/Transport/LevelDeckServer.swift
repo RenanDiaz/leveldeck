@@ -38,8 +38,8 @@ public final class LevelDeckServer {
         case stopped
         case starting
         case ready(port: UInt16)
-        case waiting(String)
-        case failed(String)
+        case waiting(NetworkIssue)
+        case failed(NetworkIssue)
     }
 
     public struct Client: Identifiable, Equatable, Sendable {
@@ -97,8 +97,11 @@ public final class LevelDeckServer {
         let listener: NWListener
         do {
             listener = try NWListener(using: parameters)
+        } catch let error as NWError {
+            status = .failed(NetworkIssue(error))
+            return
         } catch {
-            status = .failed(error.localizedDescription)
+            status = .failed(NetworkIssue(.other, detail: String(describing: error)))
             return
         }
         if advertise {
@@ -145,11 +148,11 @@ public final class LevelDeckServer {
                 status = .ready(port: port)
             }
         case let .waiting(error):
-            status = .waiting(error.localizedDescription)
+            status = .waiting(NetworkIssue(error))
         case let .failed(error):
             listener?.cancel()
             listener = nil
-            status = .failed(error.localizedDescription)
+            status = .failed(NetworkIssue(error))
         default:
             // `.cancelled` solo llega después de `stop()` o de un fallo, que ya fijaron el estado.
             break

@@ -37,23 +37,23 @@ private struct MenuContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            ChannelControl(title: "Salida", scope: .output, audio: audio)
-            ChannelControl(title: "Entrada", scope: .input, audio: audio)
+            ChannelControl(scope: .output, audio: audio)
+            ChannelControl(scope: .input, audio: audio)
             Divider()
             if let server {
                 ServiceStatusView(server: server)
             } else {
-                Label("Red: requiere TLS-PSK (Fase 3)", systemImage: "lock")
+                Label("Network: requires TLS-PSK (phase 3)", systemImage: "lock")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Divider()
             HStack {
-                Text("Protocolo v\(ProtocolVersion.current)")
+                Text("Protocol v\(ProtocolVersion.current)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("Salir") {
+                Button("Quit") {
                     NSApplication.shared.terminate(nil)
                 }
                 .keyboardShortcut("q")

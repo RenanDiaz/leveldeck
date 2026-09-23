@@ -54,7 +54,7 @@ struct VerticalFader: View {
             }
         }
         .accessibilityElement()
-        .accessibilityValue("\(Int((value * 100).rounded())) por ciento")
+        .accessibilityValue(Text(Double(value), format: .percent.precision(.fractionLength(0))))
         .accessibilityAdjustableAction { direction in
             let step: Float
             switch direction {

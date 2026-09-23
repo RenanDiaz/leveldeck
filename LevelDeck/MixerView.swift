@@ -9,8 +9,8 @@ struct MixerView: View {
         VStack(spacing: 16) {
             StatusBanner(model: model)
             HStack(spacing: 24) {
-                ChannelStrip(title: "Salida", scope: .output, model: model)
-                ChannelStrip(title: "Entrada", scope: .input, model: model)
+                ChannelStrip(scope: .output, model: model)
+                ChannelStrip(scope: .input, model: model)
             }
             #if DEBUG
             RoundTripOverlay(meter: model.roundTrip)
@@ -29,29 +29,33 @@ private struct StatusBanner: View {
         switch model.status {
         case .connected:
             if let error = model.lastError {
-                Label(error.message, systemImage: "exclamationmark.triangle")
+                Label(error.localizedMessage, systemImage: "exclamationmark.triangle")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
         case .idle, .connecting:
-            Label("Conectando…", systemImage: "antenna.radiowaves.left.and.right")
+            Label("Connecting…", systemImage: "antenna.radiowaves.left.and.right")
                 .font(.footnote)
-        case let .waiting(reason):
+        case let .waiting(issue):
             VStack(spacing: 4) {
-                Label("Esperando la red local", systemImage: "wifi.exclamationmark")
-                Text(reason).font(.caption)
-                Text("Revisa Ajustes › Privacidad y seguridad › Red local.")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                Label("Waiting for the local network", systemImage: "wifi.exclamationmark")
+                Text(issue.message)
+                    .font(.caption)
+                    .multilineTextAlignment(.center)
+                TechnicalDetail(issue: issue)
             }
             .font(.footnote)
-        case let .disconnected(reason):
+        case let .disconnected(issue):
             VStack(spacing: 6) {
-                Label("Desconectado", systemImage: "bolt.horizontal.circle")
-                if let reason {
-                    Text(reason).font(.caption).foregroundStyle(.secondary)
+                Label("Disconnected", systemImage: "bolt.horizontal.circle")
+                if let issue {
+                    Text(issue.message)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    TechnicalDetail(issue: issue)
                 }
-                Button("Reconectar") { model.connect() }
+                Button("Reconnect") { model.connect() }
                     .buttonStyle(.borderedProminent)
             }
             .font(.footnote)
@@ -59,8 +63,23 @@ private struct StatusBanner: View {
     }
 }
 
+/// Detalle técnico sin localizar (código de error del sistema). Solo en builds Debug.
+private struct TechnicalDetail: View {
+    let issue: NetworkIssue
+
+    var body: some View {
+        #if DEBUG
+        Text(verbatim: issue.detail)
+            .font(.caption2.monospaced())
+            .foregroundStyle(.tertiary)
+            .multilineTextAlignment(.center)
+        #else
+        EmptyView()
+        #endif
+    }
+}
+
 private struct ChannelStrip: View {
-    let title: String
     let scope: Scope
     let model: MixerModel
 
@@ -69,38 +88,39 @@ private struct ChannelStrip: View {
         let canSetVolume = model.isConnected && (channel?.settable ?? false)
         let canSetMute = model.isConnected && (channel?.muteSettable ?? false)
         let volume = channel?.volume ?? 0
+        let muted = channel?.muted ?? false
 
         VStack(spacing: 12) {
             Text(title).font(.headline)
-            Text("\(Int((volume * 100).rounded())) %")
+            Text(Double(volume), format: .percent.precision(.fractionLength(0)))
                 .font(.title3.monospacedDigit())
-                .foregroundStyle(channel?.muted == true ? .secondary : .primary)
+                .foregroundStyle(muted ? .secondary : .primary)
 
             VerticalFader(
                 value: volume,
                 isEnabled: canSetVolume,
-                isDimmed: channel?.muted ?? false,
+                isDimmed: muted,
                 onBegan: { model.dragBegan(scope) },
                 onChanged: { model.dragChanged(scope, to: $0) },
                 onEnded: { model.dragEnded(scope, at: $0) }
             )
             .frame(width: 88)
             .frame(maxHeight: .infinity)
-            .accessibilityLabel("Volumen de \(title.lowercased())")
+            .accessibilityLabel(volumeLabel)
 
             Button {
                 model.toggleMute(scope)
             } label: {
-                Image(systemName: muteSymbol(muted: channel?.muted ?? false))
+                Image(systemName: muteSymbol(muted: muted))
                     .font(.title2)
                     .frame(width: 56, height: 36)
             }
             .buttonStyle(.bordered)
-            .tint(channel?.muted == true ? .red : .accentColor)
+            .tint(muted ? .red : .accentColor)
             .disabled(!canSetMute)
-            .accessibilityLabel(channel?.muted == true ? "Activar \(title.lowercased())" : "Silenciar \(title.lowercased())")
+            .accessibilityLabel(muteLabel(muted: muted))
 
-            Text(channel?.deviceName ?? "Sin dispositivo")
+            Text(channel?.deviceName ?? String(localized: "No device"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -108,12 +128,35 @@ private struct ChannelStrip: View {
                 .frame(height: 32, alignment: .top)
 
             if let channel, !channel.settable {
-                Text("No permite cambiar el volumen")
+                Text("This device doesn't allow changing the volume")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private var title: String {
+        switch scope {
+        case .output: String(localized: "Output")
+        case .input: String(localized: "Input")
+        }
+    }
+
+    private var volumeLabel: String {
+        switch scope {
+        case .output: String(localized: "Output volume")
+        case .input: String(localized: "Input volume")
+        }
+    }
+
+    private func muteLabel(muted: Bool) -> String {
+        switch (scope, muted) {
+        case (.output, false): String(localized: "Mute output")
+        case (.output, true): String(localized: "Unmute output")
+        case (.input, false): String(localized: "Mute input")
+        case (.input, true): String(localized: "Unmute input")
+        }
     }
 
     private func muteSymbol(muted: Bool) -> String {
@@ -138,9 +181,10 @@ private struct RoundTripOverlay: View {
 
     private var summary: String {
         guard let last = meter.last, let average = meter.average, let maximum = meter.maximum else {
-            return "RTT: mueve un fader para medir"
+            return String(localized: "RTT: move a fader to measure")
         }
-        return "RTT \(format(last)) · prom \(format(average)) · máx \(format(maximum)) · n=\(meter.samples.count)"
+        let count = meter.samples.count
+        return String(localized: "RTT \(format(last)) · avg \(format(average)) · max \(format(maximum)) · n=\(count)")
     }
 
     private func format(_ duration: Duration) -> String {

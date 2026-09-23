@@ -1,0 +1,16 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "NSLocalNetworkUsageDescription": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LevelDeck Agent usa la red local para que tu iPhone controle el volumen de esta Mac."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

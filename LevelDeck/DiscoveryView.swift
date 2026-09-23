@@ -24,7 +24,7 @@ struct DiscoveryView: View {
                         }
                     }
                 } header: {
-                    Text("Macs en la red")
+                    Text("Macs on the network")
                 } footer: {
                     if let statusText {
                         Text(statusText)
@@ -34,9 +34,9 @@ struct DiscoveryView: View {
             .overlay {
                 if browser.agents.isEmpty {
                     ContentUnavailableView(
-                        "Buscando Macs…",
+                        "Looking for Macs…",
                         systemImage: "wifi",
-                        description: Text("Abre LevelDeck Agent en tu Mac, en la misma red Wi-Fi.")
+                        description: Text("Open LevelDeck Agent on your Mac, on the same Wi-Fi network.")
                     )
                 }
             }
@@ -55,10 +55,8 @@ struct DiscoveryView: View {
         switch browser.status {
         case .idle, .browsing:
             nil
-        case let .waiting(reason):
-            "Sin acceso a la red local (\(reason)). Revisa Ajustes › Privacidad y seguridad › Red local."
-        case let .failed(reason):
-            "La búsqueda falló: \(reason)"
+        case let .waiting(issue), let .failed(issue):
+            issue.message
         }
     }
 

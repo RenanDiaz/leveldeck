@@ -1,0 +1,326 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "Can't reach the Mac. Check that both devices are on the same Wi-Fi network and that Local Network access is allowed.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se puede llegar a la Mac. Revisa que ambos estén en la misma red Wi-Fi y que el acceso a la red local esté permitido."
+          }
+        }
+      }
+    },
+    "Connecting…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conectando…"
+          }
+        }
+      }
+    },
+    "Connection unavailable": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conexión no disponible"
+          }
+        }
+      }
+    },
+    "Couldn't connect to the Mac.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo conectar con la Mac."
+          }
+        }
+      }
+    },
+    "Couldn't find the Mac's address.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se encontró la dirección de la Mac."
+          }
+        }
+      }
+    },
+    "Disconnected": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desconectado"
+          }
+        }
+      }
+    },
+    "Input": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entrada"
+          }
+        }
+      }
+    },
+    "Input volume": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Volumen de entrada"
+          }
+        }
+      }
+    },
+    "LevelDeck": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LevelDeck"
+          }
+        }
+      }
+    },
+    "LevelDeck doesn't have Local Network access. Allow it in Settings › Privacy & Security › Local Network.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LevelDeck no tiene acceso a la red local. Permítelo en Ajustes › Privacidad y seguridad › Red local."
+          }
+        }
+      }
+    },
+    "Looking for Macs…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscando Macs…"
+          }
+        }
+      }
+    },
+    "Macs on the network": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Macs en la red"
+          }
+        }
+      }
+    },
+    "Mute input": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Silenciar entrada"
+          }
+        }
+      }
+    },
+    "Mute output": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Silenciar salida"
+          }
+        }
+      }
+    },
+    "No device": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin dispositivo"
+          }
+        }
+      }
+    },
+    "Open LevelDeck Agent on your Mac, on the same Wi-Fi network.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abre LevelDeck Agent en tu Mac, en la misma red Wi-Fi."
+          }
+        }
+      }
+    },
+    "Output": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salida"
+          }
+        }
+      }
+    },
+    "Output volume": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Volumen de salida"
+          }
+        }
+      }
+    },
+    "RTT %@ · avg %@ · max %@ · n=%lld": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RTT %@ · prom %@ · máx %@ · n=%lld"
+          }
+        }
+      }
+    },
+    "RTT: move a fader to measure": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RTT: mueve un fader para medir"
+          }
+        }
+      }
+    },
+    "Reconnect": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconectar"
+          }
+        }
+      }
+    },
+    "The Mac didn't allow that change.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La Mac no permitió ese cambio."
+          }
+        }
+      }
+    },
+    "The Mac has no default device for that channel.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La Mac no tiene dispositivo por defecto para ese canal."
+          }
+        }
+      }
+    },
+    "The Mac rejected an invalid value.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La Mac rechazó un valor inválido."
+          }
+        }
+      }
+    },
+    "The Mac rejected the connection. Make sure LevelDeck Agent is running.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La Mac rechazó la conexión. Revisa que LevelDeck Agent esté abierto."
+          }
+        }
+      }
+    },
+    "The connection to the Mac was lost.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se perdió la conexión con la Mac."
+          }
+        }
+      }
+    },
+    "This build doesn't include secure transport yet (phase 3). Protocol v%lld.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este build todavía no incluye transporte seguro (Fase 3). Protocolo v%lld."
+          }
+        }
+      }
+    },
+    "This device doesn't allow changing the volume": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este dispositivo no permite cambiar el volumen"
+          }
+        }
+      }
+    },
+    "This version of LevelDeck isn't compatible with the agent on the Mac. Update both.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta versión de LevelDeck no es compatible con el agente de la Mac. Actualiza ambos."
+          }
+        }
+      }
+    },
+    "Unmute input": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activar entrada"
+          }
+        }
+      }
+    },
+    "Unmute output": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activar salida"
+          }
+        }
+      }
+    },
+    "Waiting for the local network": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esperando la red local"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

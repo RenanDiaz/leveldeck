@@ -6,6 +6,8 @@ options:
     macOS: "14.0"
     iOS: "17.0"
   createIntermediateGroups: true
+  # Inglés es el idioma de desarrollo y el de respaldo; español va en los String Catalogs.
+  developmentLanguage: en
 
 configFiles:
   Debug: Configs/Base.xcconfig
@@ -24,6 +26,9 @@ settingGroups:
       SWIFT_STRICT_CONCURRENCY: complete
       GENERATE_INFOPLIST_FILE: YES
       ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+      LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+      # Extrae los textos localizables al compilar; check-localizations.py los usa en CI.
+      SWIFT_EMIT_LOC_STRINGS: YES
     configs:
       Debug:
         # Transporte en claro de la Fase 2, solo en Debug (SPEC §5.3). Release no lo define y
@@ -49,7 +54,8 @@ targets:
         # Solo barra de menú, sin ícono en el Dock (SPEC §5.1).
         INFOPLIST_KEY_LSUIElement: YES
         # macOS 15+ también pide permiso de red local (SPEC §6.3).
-        INFOPLIST_KEY_NSLocalNetworkUsageDescription: LevelDeck Agent usa la red local para que tu iPhone controle el volumen de esta Mac.
+        # Traducción al español en LevelDeckAgent/InfoPlist.xcstrings.
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: LevelDeck Agent uses the local network so your iPhone can control this Mac's volume.
 
   LevelDeck:
     type: application

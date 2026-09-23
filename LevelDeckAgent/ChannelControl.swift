@@ -5,7 +5,6 @@ import SwiftUI
 /// Slider de volumen con botón de mute para un `Scope`.
 /// Se deshabilita cada control por separado si el dispositivo no lo permite.
 struct ChannelControl: View {
-    let title: String
     let scope: Scope
     let audio: AudioModel
 
@@ -16,7 +15,7 @@ struct ChannelControl: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(title).font(.headline)
                 Spacer()
-                Text(channel?.deviceName ?? "Sin dispositivo")
+                Text(channel?.deviceName ?? String(localized: "No device"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -31,7 +30,7 @@ struct ChannelControl: View {
                 }
                 .buttonStyle(.borderless)
                 .disabled(!audio.canSetMute(scope))
-                .help(channel?.muted == true ? "Activar sonido" : "Silenciar")
+                .help(channel?.muted == true ? String(localized: "Unmute") : String(localized: "Mute"))
 
                 Slider(
                     value: Binding(
@@ -43,10 +42,17 @@ struct ChannelControl: View {
                 .disabled(!audio.canSetVolume(scope))
             }
             if let channel, !channel.volumeSettable {
-                Text("Este dispositivo no permite cambiar el volumen.")
+                Text("This device doesn't allow changing the volume.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    private var title: String {
+        switch scope {
+        case .output: String(localized: "Output")
+        case .input: String(localized: "Input")
         }
     }
 

@@ -16,7 +16,12 @@ struct ServiceStatusView: View {
                     .lineLimit(2)
             }
             #if DEBUG
-            Text("Transporte sin cifrar (solo Debug)")
+            if let issue {
+                Text(verbatim: issue.detail)
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(.tertiary)
+            }
+            Text("Unencrypted transport (Debug only)")
                 .font(.caption2)
                 .foregroundStyle(.orange)
             #endif
@@ -26,20 +31,29 @@ struct ServiceStatusView: View {
     private var title: String {
         switch server.status {
         case .stopped:
-            "Servicio detenido"
+            String(localized: "Service stopped")
         case .starting:
-            "Iniciando servicio…"
+            String(localized: "Starting service…")
         case let .ready(port):
-            "“\(server.advertisedName ?? "…")” · puerto \(port) · \(clientsText)"
-        case let .waiting(reason):
-            "Esperando red: \(reason)"
-        case let .failed(reason):
-            "Error del servicio: \(reason)"
+            String(localized: "“\(server.advertisedName ?? "…")” · port \(Int(port)) · \(clientsText)")
+        case .waiting:
+            String(localized: "Waiting for the network…")
+        case .failed:
+            String(localized: "The network service couldn't start.")
+        }
+    }
+
+    /// Detalle técnico del problema de red, si hay.
+    private var issue: NetworkIssue? {
+        switch server.status {
+        case let .waiting(issue), let .failed(issue): issue
+        default: nil
         }
     }
 
     private var clientsText: String {
-        server.clients.count == 1 ? "1 cliente" : "\(server.clients.count) clientes"
+        let count = server.clients.count
+        return count == 1 ? String(localized: "1 client") : String(localized: "\(count) clients")
     }
 
     private var symbol: String {
