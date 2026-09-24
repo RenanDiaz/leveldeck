@@ -1,35 +1,35 @@
 import Foundation
 
-// Almacenamiento de las claves de emparejamiento (SPEC §7). Protocolos para poder usar
-// memoria en los tests y el Keychain en las apps.
+// Storage for the pairing keys (SPEC §7). Protocols so tests can use memory and the
+// apps can use the Keychain.
 
-/// Lado de la Mac: dispositivos emparejados con su clave, y el `agentId` propio.
+/// Mac side: paired devices with their key, and its own `agentId`.
 @MainActor
 public protocol PairedDeviceStore: AnyObject {
     func loadDevices() throws -> [PairedDeviceRecord]
-    /// Inserta o reemplaza por `record.device.id`.
+    /// Inserts or replaces by `record.device.id`.
     func save(_ record: PairedDeviceRecord) throws
     func removeDevice(id: String) throws
     func loadAgentID() throws -> String?
     func saveAgentID(_ id: String) throws
 }
 
-/// Lado del iPhone: Macs emparejadas con la clave propia para cada una.
+/// iPhone side: paired Macs with its own key for each one.
 @MainActor
 public protocol PairedAgentStore: AnyObject {
     func loadAgents() throws -> [PairedAgent]
-    /// Inserta o reemplaza por `agent.id`.
+    /// Inserts or replaces by `agent.id`.
     func save(_ agent: PairedAgent) throws
     func removeAgent(id: String) throws
 }
 
-// MARK: - Memoria (tests y previews)
+// MARK: - Memory (tests and previews)
 
 @MainActor
 public final class InMemoryPairedDeviceStore: PairedDeviceStore {
     public private(set) var records: [String: PairedDeviceRecord] = [:]
     public private(set) var agentID: String?
-    /// Si se fija, toda operación falla con este error (para probar el manejo de fallos).
+    /// If set, every operation fails with this error (to test failure handling).
     public var failure: PairingStoreError?
 
     public init() {}

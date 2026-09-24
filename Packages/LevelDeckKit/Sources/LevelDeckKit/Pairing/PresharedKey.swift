@@ -1,21 +1,21 @@
 import Foundation
 import Security
 
-/// Clave de emparejamiento: 32 bytes aleatorios que un iPhone y la Mac comparten fuera de
-/// banda (el QR) y usan como PSK en el handshake TLS (SPEC §7). Nunca viaja por la red.
+/// Pairing key: 32 random bytes that an iPhone and the Mac share out of band
+/// (the QR) and use as the PSK in the TLS handshake (SPEC §7). It never travels over the network.
 public struct PresharedKey: Hashable, Sendable {
     public static let byteCount = 32
 
     public let data: Data
 
-    /// `nil` si `data` no tiene exactamente 32 bytes.
+    /// `nil` if `data` is not exactly 32 bytes.
     public init?(_ data: Data) {
         guard data.count == Self.byteCount else { return nil }
         self.data = data
     }
 
-    /// Clave nueva con `SecRandomCopyBytes`. Si el generador del sistema falla (no debería),
-    /// cae al generador criptográfico de Swift.
+    /// New key from `SecRandomCopyBytes`. If the system generator fails (it shouldn't),
+    /// falls back to Swift's cryptographic generator.
     public static func random() -> PresharedKey {
         var bytes = [UInt8](repeating: 0, count: byteCount)
         let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
@@ -34,7 +34,7 @@ public struct PresharedKey: Hashable, Sendable {
 }
 
 extension PresharedKey: Codable {
-    /// En JSON (el QR y el Keychain) viaja como base64url.
+    /// In JSON (the QR and the Keychain) it travels as base64url.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.singleValueContainer()
         let text = try container.decode(String.self)
@@ -52,11 +52,11 @@ extension PresharedKey: Codable {
     }
 }
 
-/// Claves que un extremo acepta en el handshake, por identidad (SPEC §5.3).
+/// Keys an endpoint accepts in the handshake, by identity (SPEC §5.3).
 ///
-/// El servidor pasa una entrada por dispositivo emparejado (más la pendiente durante el
-/// emparejamiento); el cliente pasa solo la suya. La identidad es el `deviceId` que la Mac
-/// asignó al emparejar.
+/// The server passes one entry per paired device (plus the pending one during
+/// pairing); the client passes only its own. The identity is the `deviceId` the Mac
+/// assigned when pairing.
 public struct PresharedKeySet: Equatable, Sendable {
     public private(set) var keys: [String: PresharedKey]
 
@@ -79,7 +79,7 @@ public struct PresharedKeySet: Equatable, Sendable {
 }
 
 extension Data {
-    /// Base64 URL-safe sin relleno (RFC 4648 §5).
+    /// URL-safe Base64 without padding (RFC 4648 §5).
     func base64URLEncodedString() -> String {
         base64EncodedString()
             .replacingOccurrences(of: "+", with: "-")

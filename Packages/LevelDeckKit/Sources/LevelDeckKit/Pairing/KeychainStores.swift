@@ -1,14 +1,14 @@
 import Foundation
 import Security
 
-/// Ítems `kSecClassGenericPassword` de un servicio, uno por cuenta, con el valor en JSON.
+/// `kSecClassGenericPassword` items for one service, one per account, with the value as JSON.
 ///
-/// - iOS: Keychain de protección de datos, con `ThisDeviceOnly` (la identidad es por
-///   dispositivo y no migra con un respaldo).
-/// - macOS: llavero de login clásico. El de protección de datos exige el entitlement
-///   `keychain-access-groups` con perfil de aprovisionamiento, que un Personal Team no da
-///   (`SecItemUpdate` falla con `errSecMissingEntitlement`). El llavero de login solo pide
-///   confirmación si cambia la identidad de firma del agente; con el mismo equipo no molesta.
+/// - iOS: data protection Keychain, with `ThisDeviceOnly` (the identity is per device
+///   and does not migrate with a backup).
+/// - macOS: classic login keychain. The data protection one requires the
+///   `keychain-access-groups` entitlement with a provisioning profile, which a Personal Team
+///   does not grant (`SecItemUpdate` fails with `errSecMissingEntitlement`). The login keychain
+///   only prompts if the agent's signing identity changes; with the same team it stays quiet.
 #if os(macOS)
 private let usesDataProtectionKeychain = false
 #else
@@ -23,9 +23,9 @@ final class KeychainRecords<Record: Codable> {
         self.service = service
     }
 
-    /// En dos pasos: el llavero de login de macOS no admite `kSecReturnData` con
-    /// `kSecMatchLimitAll` (devuelve `errSecParam`), así que primero se listan las cuentas
-    /// y después se lee cada una.
+    /// In two steps: the macOS login keychain does not support `kSecReturnData` with
+    /// `kSecMatchLimitAll` (it returns `errSecParam`), so the accounts are listed first
+    /// and then each one is read.
     func loadAll() throws -> [Record] {
         try accounts().compactMap { account -> Record? in
             guard let data = try readData(account: account) else { return nil }
@@ -49,7 +49,7 @@ final class KeychainRecords<Record: Codable> {
         return items.compactMap { $0[kSecAttrAccount as String] as? String }
     }
 
-    /// `nil` si el ítem desapareció entre el listado y la lectura.
+    /// `nil` if the item disappeared between listing and reading.
     private func readData(account: String) throws -> Data? {
         var query = baseQuery()
         query[kSecAttrAccount as String] = account
@@ -112,14 +112,14 @@ final class KeychainRecords<Record: Codable> {
     }
 }
 
-/// Keychain de la Mac (SPEC §7): un ítem por iPhone emparejado y otro con el `agentId`.
+/// Mac Keychain (SPEC §7): one item per paired iPhone and another with the `agentId`.
 @MainActor
 public final class KeychainPairedDeviceStore: PairedDeviceStore {
     private let devices: KeychainRecords<PairedDeviceRecord>
     private let identity: KeychainRecords<String>
     static let identityAccount = "agentId"
 
-    /// - Parameter service: prefijo de los servicios del Keychain; por defecto el bundle ID del agente.
+    /// - Parameter service: prefix for the Keychain services; defaults to the agent's bundle ID.
     public init(service: String = "com.renandiaz.LevelDeckAgent") {
         devices = KeychainRecords(service: service + ".pairedDevices")
         identity = KeychainRecords(service: service + ".identity")
@@ -146,7 +146,7 @@ public final class KeychainPairedDeviceStore: PairedDeviceStore {
     }
 }
 
-/// Keychain del iPhone (SPEC §7): un ítem por Mac emparejada.
+/// iPhone Keychain (SPEC §7): one item per paired Mac.
 @MainActor
 public final class KeychainPairedAgentStore: PairedAgentStore {
     private let agents: KeychainRecords<PairedAgent>

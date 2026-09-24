@@ -2,25 +2,25 @@ import CryptoKit
 import Foundation
 import Security
 
-/// Challenge-response del `hello` (SPEC §5.3, §8).
+/// Challenge-response for `hello` (SPEC §5.3, §8).
 ///
-/// Network.framework no expone la identidad PSK que negoció la conexión, así que el `deviceId`
-/// del `hello` sería una declaración sin verificar: un dispositivo emparejado podría decir que
-/// es otro y sobrevivir a su propia revocación en caliente. Para evitarlo, el agente manda un
-/// `nonce` aleatorio al abrirse la sesión y el cliente responde en el `hello` con
+/// Network.framework does not expose the PSK identity the connection negotiated, so the
+/// `deviceId` in `hello` would be an unverified claim: a paired device could say it is
+/// another one and survive its own live revocation. To prevent this, the agent sends a
+/// random `nonce` when the session opens and the client answers in `hello` with
 ///
 ///     proof = HMAC-SHA256(key, "leveldeck-hello-v3\0" ‖ nonce ‖ deviceId)
 ///
-/// usando la clave de ese `deviceId`. Solo quien tiene la clave del dispositivo declarado puede
-/// calcularla, y el `nonce` nuevo por conexión impide reusar una prueba vieja.
+/// using the key of that `deviceId`. Only whoever holds the key of the claimed device can
+/// compute it, and the fresh per-connection `nonce` prevents reusing an old proof.
 public enum HelloProof {
-    /// Largo del `nonce`, en bytes.
+    /// Length of the `nonce`, in bytes.
     public static let nonceByteCount = 32
 
-    /// Separa este uso de la clave de cualquier otro.
+    /// Separates this use of the key from any other.
     private static let label = Data("leveldeck-hello-v3".utf8) + [0]
 
-    /// `nonce` nuevo con `SecRandomCopyBytes`; si falla (no debería), con el generador de Swift.
+    /// Fresh `nonce` from `SecRandomCopyBytes`; if that fails (it shouldn't), from Swift's generator.
     public static func makeNonce() -> Data {
         var bytes = [UInt8](repeating: 0, count: nonceByteCount)
         if SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) != errSecSuccess {
@@ -36,14 +36,14 @@ public enum HelloProof {
         Data(HMAC<SHA256>.authenticationCode(for: message(nonce: nonce, deviceId: deviceId), using: symmetric(key)))
     }
 
-    /// Comparación en tiempo constante.
+    /// Constant-time comparison.
     public static func verify(_ proof: Data, nonce: Data, deviceId: String, key: PresharedKey) -> Bool {
         HMAC<SHA256>.isValidAuthenticationCode(
             proof, authenticating: message(nonce: nonce, deviceId: deviceId), using: symmetric(key)
         )
     }
 
-    /// El `nonce` tiene largo fijo y el `deviceId` va al final, así que no hay ambigüedad.
+    /// The `nonce` has a fixed length and the `deviceId` goes last, so there is no ambiguity.
     private static func message(nonce: Data, deviceId: String) -> Data {
         label + nonce + Data(deviceId.utf8)
     }

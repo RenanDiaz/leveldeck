@@ -1,7 +1,7 @@
-/// Espera entre reintentos de conexión (SPEC §6.2): 1 s, 2 s, 4 s, 8 s y luego 10 s fijos.
+/// Wait between connection retries (SPEC §6.2): 1 s, 2 s, 4 s, 8 s and then a fixed 10 s.
 ///
-/// Es lógica pura: quien reintenta cuenta los fallos seguidos y pone el reloj. El contador se
-/// reinicia al conectar.
+/// It is pure logic: whoever retries counts the consecutive failures and provides the clock.
+/// The counter resets on connect.
 public struct Backoff: Equatable, Sendable {
     public let initial: Duration
     public let maximum: Duration
@@ -11,7 +11,7 @@ public struct Backoff: Equatable, Sendable {
         self.maximum = maximum
     }
 
-    /// Espera antes del siguiente intento, después de `failures` fallos seguidos (desde 1).
+    /// Wait before the next attempt, after `failures` consecutive failures (from 1).
     public func delay(afterFailures failures: Int) -> Duration {
         var delay = initial
         for _ in 1..<max(failures, 1) {
