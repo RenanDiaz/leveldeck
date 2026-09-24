@@ -1,7 +1,7 @@
 # SPEC — LevelDeck
 
 > Deriva de `INTENT.md`. Si algo aquí contradice el intent, manda el intent.
-> Estado: borrador v1.6 (Fase 4: selector de dispositivo, controles no configurables y varios clientes)
+> Estado: borrador v1.6.1 (Fase 4: selector de dispositivo, controles no configurables y varios clientes; lectura del Keychain de la Mac en dos pasos)
 
 ## 1. Resumen
 
@@ -178,6 +178,7 @@ La clave nunca viaja por la red: el QR es el canal fuera de banda. La Mac guarda
 - Ambos lados usan `kSecClassGenericPassword`. El iPhone, en el Keychain de protección de datos con `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`: la identidad es por dispositivo y no migra con un respaldo. La Mac, en el llavero de login clásico: el de protección de datos exige el entitlement `keychain-access-groups` con perfil de aprovisionamiento, que un Personal Team no da (`errSecMissingEntitlement`); el llavero de login solo pide confirmación si cambia la identidad de firma del agente. Si el Keychain falla, las apps siguen funcionando con lo que hay en memoria y muestran un error localizado (detalle técnico solo en Debug); la Mac rechaza el emparejamiento en ese caso, para que el iPhone no se quede con una clave que ella no va a recordar.
 - Mac: servicio `com.renandiaz.LevelDeckAgent.pairedDevices`, un ítem por `deviceId` con `{ device: { id, name, pairedAt }, key }`; y `…identity` con el `agentId`, que se crea la primera vez.
 - iPhone: servicio `com.renandiaz.LevelDeck.pairedAgents`, un ítem por `agentId` con `{ id, name, deviceId, key, pairedAt }`.
+- Lectura en dos pasos, igual en ambos lados: primero se listan las cuentas del servicio (`kSecMatchLimitAll` con `kSecReturnAttributes`) y después se lee cada una (`kSecMatchLimitOne` con `kSecReturnData`). El llavero de login de macOS no admite `kSecReturnData` junto con `kSecMatchLimitAll` (devuelve `errSecParam`, -50).
 - Los stores están detrás de protocolos (`PairedDeviceStore`, `PairedAgentStore`) con implementaciones en memoria para los tests.
 
 ## 8. Protocolo
@@ -287,6 +288,7 @@ Cada fase termina con algo que se puede usar y probar.
 - **LevelDeckKit:** tests unitarios de codificación del protocolo, formato del QR (`PairingCode`, `PresharedKey`), política del `hello` en `PairingManager` (pendiente, conocido, desconocido, fallo del store) y lógica de throttle y coalescing.
 - **AudioController:** detrás de `AudioControlling`. Tests con mock para la lógica de estado (incluida la de dispositivos: conexión y desconexión en caliente, activo que desaparece, dispositivo que desaparece antes del toque, errores de lectura de la lista y flags independientes) y una verificación manual contra el hardware real (CoreAudio no se puede mockear de forma útil a bajo nivel; el filtro de ocultos y de streams se verifica ahí).
 - **Integración:** tests que levantan el servidor de `LevelDeckKit` en loopback con TLS-PSK. `LoopbackIntegrationTests` verifica el ciclo completo `hello` → `setVolume` → `state`, `setMute`, errores y dos clientes con claves distintas a la vez (claves fijas de prueba, sin `authorizer`). Desde la Fase 4, con dos clientes: la lista y la selección de dispositivo llegan a ambos, el activo que desaparece también, `deviceNotFound` solo le llega a quien lo pidió, y el que arrastra (con su `MixerState`) no se mueve por los cambios del otro y queda invalidado si el otro cambia de dispositivo. `PairingIntegrationTests` cubre la Fase 3 con `PairingManager` y un store en memoria: dispositivo emparejado conecta y reconecta, identidad desconocida y clave incorrecta se rechazan en el handshake, `hello` sin `deviceId` se rechaza, dispositivo revocado pierde la conexión activa y no vuelve, el QR cancelado o vencido no sirve, y una sesión activa sobrevive al reinicio del listener. `PlaintextSmokeTests` mantiene vivo el transporte en claro de Debug.
+- **Keychain real:** `KeychainStoreTests` (solo macOS) usa `KeychainPairedDeviceStore` contra el llavero de login, con un servicio único por test que se borra al terminar: store vacío sin error, dispositivos ordenados por `pairedAt` con sus claves, ida y vuelta del `agentId` y revocación de un solo dispositivo.
 - **Checklist manual por fase,** basado en los criterios de "Listo cuando".
 
 ## 12. Distribución
