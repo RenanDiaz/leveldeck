@@ -1,8 +1,8 @@
 import LevelDeckKit
 import SwiftUI
 
-/// Selector del dispositivo por defecto de un scope (SPEC §6.1). La lista viene del último
-/// `state`, así que cambia en vivo al conectar o desconectar algo en la Mac.
+/// Picker for a scope's default device (SPEC §6.1). The list comes from the latest
+/// `state`, so it updates live when something is plugged into or unplugged from the Mac.
 struct DevicePickerView: View {
     let scope: Scope
     let model: MixerModel
@@ -53,7 +53,7 @@ struct DevicePickerView: View {
         }
         .presentationDetents([.medium, .large])
         .onChange(of: model.isConnected) {
-            // Sin conexión la lista ya no es confiable y elegir no haría nada.
+            // Without a connection the list is no longer reliable and picking would do nothing.
             if !model.isConnected {
                 dismiss()
             }

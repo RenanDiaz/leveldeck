@@ -1,33 +1,33 @@
 @preconcurrency import Network
 
-/// Problema de red, tipado para que cada app muestre su propio mensaje localizado.
+/// Network problem, typed so each app shows its own localized message.
 ///
-/// `LevelDeckKit` no genera textos de interfaz: el `localizedDescription` de `NWError`
-/// mezcla una frase localizada con el detalle técnico en inglés. `detail` queda solo para
-/// diagnóstico (logs, builds Debug).
+/// `LevelDeckKit` doesn't produce UI text: `NWError`'s `localizedDescription` mixes a
+/// localized sentence with technical detail in English. `detail` is only for
+/// diagnostics (logs, Debug builds).
 public struct NetworkIssue: Equatable, Sendable {
     public enum Kind: Equatable, Sendable {
-        /// Sin permiso de red local (iOS) o política del sistema.
+        /// No local network permission (iOS) or a system policy.
         case localNetworkDenied
-        /// La conexión se cayó (abortada, reiniciada, timeout). En iOS pasa al suspender la app.
+        /// The connection dropped (aborted, reset, timeout). On iOS this happens when the app is suspended.
         case connectionLost
-        /// El otro lado rechazó la conexión (p. ej. el agente no está corriendo).
+        /// The other side refused the connection (e.g. the agent isn't running).
         case refused
-        /// No hay ruta hacia el otro lado.
+        /// There's no route to the other side.
         case unreachable
-        /// No se pudo obtener la dirección del servicio Bonjour.
+        /// Couldn't obtain the Bonjour service's address.
         case unresolved
-        /// El handshake TLS falló: la Mac no reconoce la identidad o la clave de este
-        /// dispositivo (no está emparejado o se revocó).
+        /// The TLS handshake failed: the Mac doesn't recognize this device's identity or key
+        /// (it isn't paired or was revoked).
         case handshakeFailed
-        /// La conexión se abrió pero el agente no completó el `challenge` → `state` a tiempo
-        /// (p. ej. habla otra versión del protocolo o se colgó).
+        /// The connection opened but the agent didn't complete `challenge` → `state` in time
+        /// (e.g. it speaks another protocol version or hung).
         case noResponse
         case other
     }
 
     public let kind: Kind
-    /// Descripción técnica, sin localizar.
+    /// Technical description, not localized.
     public let detail: String
 
     public init(_ kind: Kind, detail: String) {
@@ -35,12 +35,12 @@ public struct NetworkIssue: Equatable, Sendable {
         self.detail = detail
     }
 
-    /// `kDNSServiceErr_PolicyDenied`: el sistema negó el acceso a la red local.
+    /// `kDNSServiceErr_PolicyDenied`: the system denied local network access.
     private static let dnsPolicyDenied: Int32 = -65570
 
-    /// - Parameter path: ruta de la conexión al fallar. Si el sistema reporta la red local
-    ///   denegada, manda sobre el código de error: al quitar el permiso con la conexión
-    ///   abierta, iOS la aborta con el mismo `ECONNABORTED` que al suspender la app.
+    /// - Parameter path: the connection's path at the time of failure. If the system reports
+    ///   local network denied, it takes precedence over the error code: when the permission is
+    ///   removed with the connection open, iOS aborts it with the same `ECONNABORTED` as on suspend.
     public init(_ error: NWError, path: NWPath? = nil) {
         detail = error.debugDescription
         if path?.unsatisfiedReason == .localNetworkDenied {

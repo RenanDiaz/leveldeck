@@ -1,40 +1,40 @@
 import Foundation
 import Observation
 
-/// Emparejamiento del lado de la Mac (SPEC §7): genera el QR, mantiene la clave pendiente,
-/// registra el dispositivo en el primer `hello` y revoca.
+/// Mac-side pairing (SPEC §7): generates the QR, holds the pending key,
+/// registers the device on the first `hello`, and revokes.
 ///
-/// Es el `authorizer` del servidor y el dueño del conjunto de PSK que el listener acepta:
-/// cada cambio del conjunto (empieza o termina un emparejamiento, se revoca un dispositivo)
-/// se aplica con `LevelDeckServer.update(security:)`, que reinicia el listener sin tocar las
-/// sesiones activas.
+/// It is the server's `authorizer` and the owner of the PSK set the listener accepts:
+/// every change to the set (a pairing starts or ends, a device is revoked) is applied
+/// with `LevelDeckServer.update(security:)`, which restarts the listener without touching
+/// active sessions.
 ///
-/// Ciclo de vida de la clave pendiente:
-/// 1. `beginPairing` la genera y la mete en el listener junto con las emparejadas. Vive solo
-///    en memoria (`pending`) hasta el primer `hello`.
-/// 2. Si un `hello` llega con su `deviceId` antes del vencimiento, el dispositivo se guarda en
-///    el Keychain y `pending` se vacía. El conjunto de claves no cambia, así que no hay reinicio.
-/// 3. Si vence o se cancela antes, la clave sale del listener (reinicio) y se descarta. Un
-///    `hello` que llegue después del vencimiento se rechaza con `notPaired`.
+/// Pending key lifecycle:
+/// 1. `beginPairing` generates it and puts it in the listener along with the paired ones. It
+///    lives only in memory (`pending`) until the first `hello`.
+/// 2. If a `hello` arrives with its `deviceId` before expiry, the device is saved to the
+///    Keychain and `pending` is cleared. The key set does not change, so there is no restart.
+/// 3. If it expires or is cancelled first, the key leaves the listener (restart) and is
+///    discarded. A `hello` arriving after expiry is rejected with `notPaired`.
 @MainActor
 @Observable
 public final class PairingManager: LevelDeckServerAuthorizer {
     public struct Pending: Equatable, Sendable {
         public let code: PairingCode
-        /// Para el contador de la ventana del QR.
+        /// For the QR window's countdown.
         public let expiresAt: Date
         let deadline: ContinuousClock.Instant
     }
 
-    /// Cuánto vive el QR (SPEC §7).
+    /// How long the QR lives (SPEC §7).
     public static let defaultWindow: Duration = .seconds(120)
 
     public let agentID: String
     public private(set) var devices: [PairedDevice] = []
     public private(set) var pending: Pending?
-    /// Dispositivo emparejado con el QR actual, para que la ventana muestre la confirmación.
+    /// Device paired with the current QR, so the window can show the confirmation.
     public private(set) var lastPaired: PairedDevice?
-    /// Último fallo del Keychain. La app lo muestra localizado.
+    /// Last Keychain failure. The app shows it localized.
     public private(set) var storeError: PairingStoreError?
 
     private let store: any PairedDeviceStore
@@ -43,8 +43,8 @@ public final class PairingManager: LevelDeckServerAuthorizer {
     @ObservationIgnored private var keys: [String: PresharedKey] = [:]
     @ObservationIgnored private var expiryTask: Task<Void, Never>?
 
-    /// Carga los dispositivos del `store`, se registra como `authorizer` del servidor y le
-    /// aplica el conjunto de claves.
+    /// Loads the devices from the `store`, registers as the server's `authorizer`, and
+    /// applies the key set to it.
     public init(
         store: any PairedDeviceStore, server: LevelDeckServer, agentID: String,
         window: Duration = PairingManager.defaultWindow
@@ -66,7 +66,7 @@ public final class PairingManager: LevelDeckServerAuthorizer {
         server.update(security: security)
     }
 
-    /// Lee el `agentId` del `store` o crea uno y lo guarda.
+    /// Reads the `agentId` from the `store` or creates one and saves it.
     public static func loadOrCreateAgentID(in store: any PairedDeviceStore) throws -> String {
         if let existing = try store.loadAgentID() {
             return existing
@@ -76,7 +76,7 @@ public final class PairingManager: LevelDeckServerAuthorizer {
         return id
     }
 
-    /// Claves que el listener acepta: las emparejadas más la pendiente, si hay.
+    /// Keys the listener accepts: the paired ones plus the pending one, if any.
     public var security: TransportSecurity {
         var set = PresharedKeySet(keys)
         if let pending {
@@ -89,9 +89,9 @@ public final class PairingManager: LevelDeckServerAuthorizer {
         server.clients.contains { $0.deviceId == deviceID }
     }
 
-    // MARK: - Emparejar
+    // MARK: - Pairing
 
-    /// Genera un QR nuevo (reemplaza al pendiente, si había) y lo mete en el listener.
+    /// Generates a new QR (replacing the pending one, if any) and puts it in the listener.
     @discardableResult
     public func beginPairing(agentName: String) -> PairingCode {
         expiryTask?.cancel()
@@ -110,7 +110,7 @@ public final class PairingManager: LevelDeckServerAuthorizer {
         return code
     }
 
-    /// Descarta el QR pendiente y saca su clave del listener. No hace nada si no hay uno.
+    /// Discards the pending QR and removes its key from the listener. Does nothing if there is none.
     public func cancelPairing() {
         expiryTask?.cancel()
         expiryTask = nil
@@ -126,10 +126,10 @@ public final class PairingManager: LevelDeckServerAuthorizer {
         server.update(security: security)
     }
 
-    // MARK: - Revocar
+    // MARK: - Revocation
 
-    /// Borra la clave del dispositivo, cierra su conexión activa (con `notPaired`) y saca la
-    /// clave del listener, así que tampoco puede volver a conectar.
+    /// Deletes the device's key, closes its active connection (with `notPaired`), and removes
+    /// the key from the listener, so it cannot reconnect either.
     public func revoke(_ deviceID: String) {
         do {
             try store.removeDevice(id: deviceID)
@@ -148,10 +148,10 @@ public final class PairingManager: LevelDeckServerAuthorizer {
 
     // MARK: - LevelDeckServerAuthorizer
 
-    /// Un cliente que pasó el handshake manda su `deviceId` en el `hello`, y el servidor ya
-    /// verificó con la `proof` que tiene la clave de ese `deviceId` (SPEC §8). Si es un
-    /// dispositivo emparejado, se actualiza su nombre; si es el pendiente y el QR no venció,
-    /// se registra; cualquier otro se rechaza.
+    /// A client that passed the handshake sends its `deviceId` in `hello`, and the server has
+    /// already verified with the `proof` that it holds the key for that `deviceId` (SPEC §8). If it
+    /// is a paired device, its name is updated; if it is the pending one and the QR has not
+    /// expired, it is registered; anything else is rejected.
     public func authorize(deviceId: String?, deviceName: String) -> Bool {
         guard let deviceId else { return false }
         if keys[deviceId] != nil {
@@ -183,7 +183,7 @@ public final class PairingManager: LevelDeckServerAuthorizer {
         self.pending = nil
         lastPaired = device
         storeError = nil
-        // El conjunto de claves no cambió (la pendiente pasó a emparejada): sin reinicio.
+        // The key set did not change (the pending key became paired): no restart.
         return true
     }
 

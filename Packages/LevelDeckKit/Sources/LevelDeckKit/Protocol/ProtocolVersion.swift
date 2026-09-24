@@ -1,6 +1,6 @@
-/// Versión del protocolo de mensajes (SPEC §8). Viaja como `v` en `hello` y `state`.
+/// Message protocol version (SPEC §8). Travels as `v` in `hello` and `state`.
 public enum ProtocolVersion {
-    /// v2 (Fase 4): `settable` pasa a `volumeSettable`.
-    /// v3 (Fase 5): el agente abre con `challenge` y el `hello` lleva `proof` (SPEC §8).
+    /// v2 (Phase 4): `settable` becomes `volumeSettable`.
+    /// v3 (Phase 5): the agent opens with `challenge` and `hello` carries `proof` (SPEC §8).
     public static let current = 3
 }

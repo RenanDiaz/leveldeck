@@ -3,8 +3,8 @@ import LevelDeckKit
 import SwiftUI
 import UIKit
 
-/// Emparejar una Mac (SPEC §7): escanear el QR, guardar la clave y hacer la primera conexión,
-/// que es la que registra este iPhone en la Mac.
+/// Pair a Mac (SPEC §7): scan the QR code, store the key and make the first connection,
+/// which is what registers this iPhone on the Mac.
 struct PairingView: View {
     let pairedAgents: PairedAgents
     let browser: ServiceBrowser
@@ -109,7 +109,7 @@ struct PairingView: View {
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
         #if DEBUG
-        // Sin cámara (simulador): pegar el código que la ventana del agente muestra en Debug.
+        // No camera (simulator): paste the code the agent's window shows in Debug.
         Button("Paste Code") {
             if let text = UIPasteboard.general.string {
                 flow.handle(scanned: text, pairedAgents: pairedAgents, browser: browser)
@@ -119,7 +119,7 @@ struct PairingView: View {
     }
 }
 
-/// Detalle técnico sin localizar (código de error del sistema). Solo en builds Debug.
+/// Unlocalized technical detail (system error code). Debug builds only.
 struct TechnicalDetail: View {
     let issue: NetworkIssue
 
@@ -153,7 +153,7 @@ enum CameraAccess {
     }
 }
 
-/// Estado del emparejamiento: del QR a la primera conexión.
+/// Pairing state: from the QR code to the first connection.
 @MainActor
 @Observable
 final class PairingFlow {
@@ -218,7 +218,7 @@ final class PairingFlow {
         client = nil
     }
 
-    /// Espera a que la Mac aparezca por Bonjour, conecta y espera el primer `state`.
+    /// Waits for the Mac to show up over Bonjour, connects and waits for the first `state`.
     private func connect(_ agent: PairedAgent, pairedAgents: PairedAgents, browser: ServiceBrowser) async {
         let deadline = ContinuousClock.now + .seconds(15)
         while browser.agents.first(where: { $0.agentID == agent.id }) == nil {

@@ -2,7 +2,7 @@ import Foundation
 @preconcurrency import Network
 import Observation
 
-/// Error que el agente reporta al cliente con un mensaje `error` (SPEC §8).
+/// Error the agent reports to the client with an `error` message (SPEC §8).
 public struct AgentError: Error, Sendable, Equatable {
     public var code: ErrorCode
     public var message: String
@@ -13,46 +13,46 @@ public struct AgentError: Error, Sendable, Equatable {
     }
 }
 
-/// Lo que el servidor necesita del agente: el estado actual y aplicar comandos.
+/// What the server needs from the agent: the current state and applying commands.
 @MainActor
 public protocol LevelDeckServerDelegate: AnyObject {
     func currentState() -> StateSnapshot
-    /// Aplica un comando del cliente. Devuelve el error a reportar, o `nil` si se aplicó.
-    /// Nunca recibe `hello`: el servidor maneja el handshake.
+    /// Applies a client command. Returns the error to report, or `nil` if it was applied.
+    /// Never receives `hello`: the server handles the handshake.
     func handle(_ command: ClientMessage) -> AgentError?
 }
 
-/// Decide si un cliente que ya pasó el handshake puede usar la sesión (SPEC §7).
+/// Decides whether a client that already passed the handshake may use the session (SPEC §7).
 @MainActor
 public protocol LevelDeckServerAuthorizer: AnyObject {
-    /// `deviceId` es la identidad que el cliente declaró en el `hello` (`nil` si no mandó).
-    /// Con TLS-PSK, el servidor ya verificó la `proof` del `hello` contra la clave de ese
-    /// `deviceId`: el cliente demostró ser ese dispositivo.
-    /// Si devuelve `false`, el servidor responde `notPaired` y cierra.
+    /// `deviceId` is the identity the client declared in `hello` (`nil` if it didn't send one).
+    /// With TLS-PSK, the server has already verified the `hello`'s `proof` against that
+    /// `deviceId`'s key: the client proved it is that device.
+    /// If it returns `false`, the server replies `notPaired` and closes.
     func authorize(deviceId: String?, deviceName: String) -> Bool
 }
 
-/// Servidor del agente (SPEC §5.3): `NWListener` en un puerto dinámico, anunciado por
-/// Bonjour, con varios clientes simultáneos.
+/// The agent's server (SPEC §5.3): an `NWListener` on a dynamic port, advertised over
+/// Bonjour, with several simultaneous clients.
 ///
-/// - Las claves TLS-PSK van en `security`. `update(security:)` reinicia el listener con el
-///   conjunto nuevo (puerto nuevo, mismo nombre Bonjour); las sesiones ya aceptadas son
-///   independientes del listener y siguen vivas. `disconnect(deviceId:)` cierra las de un
-///   dispositivo revocado.
-/// - Si hay `authorizer`, cada `hello` pasa por él; sin `authorizer` se acepta cualquiera.
+/// - The TLS-PSK keys go in `security`. `update(security:)` restarts the listener with the
+///   new set (new port, same Bonjour name); already accepted sessions are independent of
+///   the listener and stay alive. `disconnect(deviceId:)` closes the ones belonging to a
+///   revoked device.
+/// - If there's an `authorizer`, every `hello` goes through it; without one, anyone is accepted.
 ///
-/// - Handshake: al abrirse la sesión el servidor manda `challenge` con un `nonce` nuevo. El
-///   primer mensaje del cliente debe ser `hello`. Si la versión no coincide se responde
-///   `unsupportedVersion` y se cierra. Con TLS-PSK, la `proof` del `hello` tiene que ser el
-///   HMAC del `nonce` con la clave del `deviceId` declarado, según el conjunto de claves
-///   vigente; si no, `notPaired` y se cierra (SPEC §8). Cualquier otro mensaje antes de
-///   `hello` cierra la conexión, y una sesión sin `hello` válido en `helloTimeout` también.
-/// - Si el listener falla (p. ej. se cayó la red), se reintenta con `Backoff`.
-///   `restartListener()` lo recrea a pedido (al despertar la Mac o al cambiar de red).
-/// - Un frame que no se puede decodificar (tipo desconocido, campo faltante, volumen fuera
-///   de rango) se responde con `invalidValue` y la conexión sigue abierta.
-/// - Los `state` se agrupan a un máximo de 30 por segundo y no se reenvían si el snapshot
-///   no cambió, así que cada cambio produce un único evento aunque llegue por varias vías.
+/// - Handshake: when the session opens, the server sends `challenge` with a fresh `nonce`. The
+///   client's first message must be `hello`. If the version doesn't match, it replies
+///   `unsupportedVersion` and closes. With TLS-PSK, the `hello`'s `proof` must be the HMAC
+///   of the `nonce` with the declared `deviceId`'s key, according to the current key set;
+///   otherwise, `notPaired` and it closes (SPEC §8). Any other message before `hello`
+///   closes the connection, and so does a session without a valid `hello` within `helloTimeout`.
+/// - If the listener fails (e.g. the network dropped), it retries with `Backoff`.
+///   `restartListener()` recreates it on demand (when the Mac wakes or the network changes).
+/// - A frame that can't be decoded (unknown type, missing field, volume out of range) gets
+///   an `invalidValue` reply and the connection stays open.
+/// - `state` messages are coalesced to at most 30 per second and not resent if the snapshot
+///   didn't change, so each change produces a single event even if it arrives by several paths.
 @MainActor
 @Observable
 public final class LevelDeckServer {
@@ -67,14 +67,14 @@ public final class LevelDeckServer {
     public struct Client: Identifiable, Equatable, Sendable {
         public let id: UUID
         public let deviceName: String
-        /// Identidad declarada en el `hello` (SPEC §7).
+        /// Identity declared in `hello` (SPEC §7).
         public let deviceId: String?
     }
 
     public private(set) var status: Status = .stopped
-    /// Nombre con el que quedó registrado en Bonjour (la Mac puede agregarle un sufijo).
+    /// Name it ended up registered under in Bonjour (the Mac may add a suffix).
     public private(set) var advertisedName: String?
-    /// Clientes que ya completaron el `hello`.
+    /// Clients that have completed `hello`.
     public private(set) var clients: [Client] = []
 
     public var port: UInt16? {
@@ -93,22 +93,22 @@ public final class LevelDeckServer {
     private let fixedPort: NWEndpoint.Port?
     private let backoff = Backoff()
     @ObservationIgnored private var listener: NWListener?
-    /// Fallos seguidos del listener, para el backoff del reintento.
+    /// Consecutive listener failures, for the retry backoff.
     @ObservationIgnored private var listenerFailures = 0
     @ObservationIgnored private var listenerRetry: Task<Void, Never>?
     @ObservationIgnored private var sessions: [UUID: Session] = [:]
     @ObservationIgnored private var broadcaster: ThrottledSender<StateSnapshot>?
-    /// Últimos eventos de conexión, para diagnosticar fallos en tests.
+    /// Latest connection events, for diagnosing failures in tests.
     @ObservationIgnored private(set) var connectionEvents: [String] = []
 
     /// - Parameters:
-    ///   - advertise: anunciar el servicio por Bonjour. Los tests en loopback lo apagan.
-    ///   - serviceName: nombre Bonjour; `nil` usa el nombre de la Mac.
-    ///   - agentID: `agentId` de la Mac; se anuncia en el registro TXT (SPEC §7).
-    ///   - requiredInterfaceType: limita el listener a una interfaz (p. ej. `.loopback`).
-    ///   - helloTimeout: cuánto espera un `hello` válido antes de cerrar la sesión.
-    ///   - port: puerto fijo; `nil` (lo normal) usa uno dinámico. Los tests de reconexión
-    ///     lo fijan para que el cliente encuentre al servidor en el mismo lugar.
+    ///   - advertise: advertise the service over Bonjour. Loopback tests turn it off.
+    ///   - serviceName: Bonjour name; `nil` uses the Mac's name.
+    ///   - agentID: the Mac's `agentId`; advertised in the TXT record (SPEC §7).
+    ///   - requiredInterfaceType: restricts the listener to one interface (e.g. `.loopback`).
+    ///   - helloTimeout: how long to wait for a valid `hello` before closing the session.
+    ///   - port: fixed port; `nil` (the usual) uses a dynamic one. Reconnection tests
+    ///     pin it so the client finds the server in the same place.
     public init(
         security: TransportSecurity,
         advertise: Bool = true,
@@ -135,17 +135,17 @@ public final class LevelDeckServer {
         startListener()
     }
 
-    /// Cambia el transporte (p. ej. el conjunto de PSK). Si el servicio está corriendo, el
-    /// listener se reinicia con el nuevo; las sesiones activas no se tocan.
+    /// Changes the transport (e.g. the PSK set). If the service is running, the listener
+    /// restarts with the new one; active sessions are left alone.
     public func update(security: TransportSecurity) {
         self.security = security
         guard listener != nil else { return }
         replaceListener()
     }
 
-    /// Recrea el listener y vuelve a anunciarse por Bonjour, sin tocar las sesiones activas.
-    /// Se usa al despertar la Mac o al cambiar de red. También reintenta ya si el listener
-    /// había fallado. No hace nada si el servicio está detenido.
+    /// Recreates the listener and re-advertises over Bonjour, without touching active sessions.
+    /// Used when the Mac wakes or the network changes. Also retries immediately if the listener
+    /// had failed. Does nothing if the service is stopped.
     public func restartListener() {
         guard listener != nil || listenerRetry != nil else { return }
         listenerFailures = 0
@@ -164,7 +164,7 @@ public final class LevelDeckServer {
         startListener()
     }
 
-    /// Cierra las sesiones del dispositivo, avisando `notPaired` antes (SPEC §7).
+    /// Closes the device's sessions, sending `notPaired` first (SPEC §7).
     public func disconnect(deviceId: String) {
         for session in sessions.values where session.deviceId == deviceId {
             let sent = session.connection.send(
@@ -237,7 +237,7 @@ public final class LevelDeckServer {
         status = .stopped
     }
 
-    /// Avisa que el estado del agente cambió. Se envía a todos los clientes, agrupado.
+    /// Signals that the agent's state changed. Sent to all clients, coalesced.
     public func stateDidChange() {
         guard let state = delegate?.currentState() else { return }
         broadcaster?.submit(state)
@@ -245,7 +245,7 @@ public final class LevelDeckServer {
 
     // MARK: - Listener
 
-    /// Un listener reemplazado o detenido ya no toca el estado del servidor.
+    /// A replaced or stopped listener no longer touches the server's state.
     private func detach(_ listener: NWListener) {
         listener.stateUpdateHandler = nil
         listener.serviceRegistrationUpdateHandler = nil
@@ -270,12 +270,12 @@ public final class LevelDeckServer {
             status = .failed(NetworkIssue(error))
             scheduleListenerRetry()
         default:
-            // `.cancelled` solo llega después de `stop()` o de un fallo, que ya fijaron el estado.
+            // `.cancelled` only arrives after `stop()` or a failure, which already set the status.
             break
         }
     }
 
-    /// Reintenta levantar el listener tras un fallo, con `Backoff`.
+    /// Retries bringing up the listener after a failure, with `Backoff`.
     private func scheduleListenerRetry() {
         listenerFailures += 1
         let delay = backoff.delay(afterFailures: listenerFailures)
@@ -305,7 +305,7 @@ public final class LevelDeckServer {
         }
     }
 
-    // MARK: - Sesiones
+    // MARK: - Sessions
 
     private func accept(_ nwConnection: NWConnection) {
         let id = UUID()
@@ -335,7 +335,7 @@ public final class LevelDeckServer {
         log(event)
         switch event {
         case .ready:
-            // El `nonce` de esta sesión; el `hello` tiene que firmarlo (SPEC §8).
+            // This session's `nonce`; the `hello` must sign it (SPEC §8).
             let nonce = HelloProof.makeNonce()
             session.nonce = nonce
             session.connection.send(.challenge(nonce: nonce))
@@ -362,7 +362,7 @@ public final class LevelDeckServer {
                 }
                 return
             }
-            // El `nonce` es de un solo uso: un segundo `hello` en la misma sesión no pasa.
+            // The `nonce` is single-use: a second `hello` in the same session doesn't pass.
             let nonce = session.nonce
             session.nonce = nil
             let proven = proves(deviceId: deviceId, proof: proof, nonce: nonce)
@@ -392,13 +392,13 @@ public final class LevelDeckServer {
         if let error = delegate.handle(message) {
             session.connection.send(.error(code: error.code, message: error.message))
         }
-        // El dedup del broadcaster evita un `state` repetido si el comando no cambió nada.
+        // The broadcaster's dedup avoids a repeated `state` if the command changed nothing.
         stateDidChange()
     }
 
-    /// `true` si la `proof` demuestra que el cliente tiene la clave del `deviceId` que declara,
-    /// según el conjunto de claves vigente: un dispositivo revocado o un QR vencido ya no
-    /// están ahí. En claro (solo desarrollo) no hay claves y no se exige.
+    /// `true` if the `proof` shows the client has the key for the `deviceId` it declares,
+    /// according to the current key set: a revoked device or an expired QR code are no
+    /// longer there. In plaintext (development only) there are no keys and it isn't required.
     private func proves(deviceId: String?, proof: Data?, nonce: Data?) -> Bool {
         switch security {
         #if LEVELDECK_INSECURE_TRANSPORT
@@ -458,13 +458,13 @@ public final class LevelDeckServer {
 private final class Session {
     let id: UUID
     let connection: MessageConnection<ClientMessage, AgentMessage>
-    /// `nil` hasta que llega un `hello` válido.
+    /// `nil` until a valid `hello` arrives.
     var deviceName: String?
-    /// Identidad declarada en el `hello`, si el cliente la mandó.
+    /// Identity declared in `hello`, if the client sent it.
     var deviceId: String?
-    /// `nonce` del `challenge`, hasta que llega el `hello`.
+    /// The `challenge`'s `nonce`, until the `hello` arrives.
     var nonce: Data?
-    /// Cierra la sesión si no llega un `hello` válido a tiempo.
+    /// Closes the session if a valid `hello` doesn't arrive in time.
     var helloTimer: Task<Void, Never>?
 
     init(id: UUID, connection: MessageConnection<ClientMessage, AgentMessage>) {

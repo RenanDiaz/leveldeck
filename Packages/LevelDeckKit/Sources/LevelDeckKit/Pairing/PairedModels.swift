@@ -1,10 +1,10 @@
 import Foundation
 
-/// iPhone emparejado, visto desde la Mac (SPEC §7). La clave se guarda aparte, en el Keychain.
+/// Paired iPhone, as seen from the Mac (SPEC §7). The key is stored separately, in the Keychain.
 public struct PairedDevice: Identifiable, Equatable, Sendable, Codable {
-    /// Identidad PSK que la Mac le asignó al emparejar.
+    /// PSK identity the Mac assigned to it when pairing.
     public let id: String
-    /// Nombre que el iPhone declaró en su último `hello`.
+    /// Name the iPhone declared in its last `hello`.
     public var name: String
     public let pairedAt: Date
 
@@ -15,7 +15,7 @@ public struct PairedDevice: Identifiable, Equatable, Sendable, Codable {
     }
 }
 
-/// Lo que la Mac persiste por dispositivo: el dispositivo y su clave.
+/// What the Mac persists per device: the device and its key.
 public struct PairedDeviceRecord: Equatable, Sendable, Codable {
     public var device: PairedDevice
     public var key: PresharedKey
@@ -26,12 +26,12 @@ public struct PairedDeviceRecord: Equatable, Sendable, Codable {
     }
 }
 
-/// Mac emparejada, vista desde el iPhone (SPEC §7).
+/// Paired Mac, as seen from the iPhone (SPEC §7).
 public struct PairedAgent: Identifiable, Equatable, Sendable, Codable {
-    /// `agentId` de la Mac; coincide con el TXT `id` que anuncia por Bonjour.
+    /// The Mac's `agentId`; matches the TXT `id` it advertises over Bonjour.
     public let id: String
     public var name: String
-    /// Identidad PSK que esta Mac le dio a este iPhone.
+    /// PSK identity this Mac gave to this iPhone.
     public let deviceID: String
     public let key: PresharedKey
     public let pairedAt: Date
@@ -48,18 +48,18 @@ public struct PairedAgent: Identifiable, Equatable, Sendable, Codable {
         self.init(id: code.agentID, name: code.agentName, deviceID: code.deviceID, key: code.key, pairedAt: pairedAt)
     }
 
-    /// Transporte para conectar con esta Mac: TLS-PSK con la clave propia.
+    /// Transport for connecting to this Mac: TLS-PSK with its own key.
     public var security: TransportSecurity {
         .tlsPSK(.single(identity: deviceID, key: key))
     }
 }
 
-/// Fallo del almacenamiento (Keychain). La app arma el texto localizado; `detail` es diagnóstico.
+/// Storage (Keychain) failure. The app builds the localized text; `detail` is diagnostic.
 public struct PairingStoreError: Error, Equatable, Sendable {
     public enum Kind: Equatable, Sendable {
-        /// `SecItem*` devolvió un error; `status` es el `OSStatus`.
+        /// `SecItem*` returned an error; `status` is the `OSStatus`.
         case keychain(status: Int32)
-        /// Un registro guardado no se pudo decodificar.
+        /// A stored record could not be decoded.
         case corrupted
     }
 

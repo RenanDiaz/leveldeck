@@ -2,8 +2,8 @@ import AgentAudio
 import LevelDeckKit
 import SwiftUI
 
-/// Slider de volumen con botón de mute para un `Scope`.
-/// Se deshabilita cada control por separado si el dispositivo no lo permite.
+/// Volume slider with a mute button for a `Scope`.
+/// Each control is disabled separately if the device doesn't allow it.
 struct ChannelControl: View {
     let scope: Scope
     let audio: AudioModel

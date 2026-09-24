@@ -8,7 +8,7 @@ struct LevelDeckAgentApp: App {
     @State private var audio: AudioModel
     @State private var remote: RemoteService
     @State private var loginItem: LoginItem
-    /// Se guarda para que viva lo que vive la app.
+    /// Kept so it lives as long as the app does.
     private let systemEvents: SystemEvents
 
     init() {
@@ -20,8 +20,8 @@ struct LevelDeckAgentApp: App {
         remote.start()
         _remote = State(initialValue: remote)
 
-        // Al despertar o cambiar de red: volver a anunciarse y, al despertar, re-suscribir
-        // los listeners de CoreAudio (SPEC §5.2, §5.3).
+        // On wake or network change: re-advertise and, on wake, resubscribe
+        // the CoreAudio listeners (SPEC §5.2, §5.3).
         systemEvents = SystemEvents(
             onWake: {
                 remote.server.restartListener()
@@ -42,11 +42,11 @@ struct LevelDeckAgentApp: App {
         MenuBarExtra {
             MenuContent(audio: audio, remote: remote, loginItem: loginItem)
         } label: {
-            // Template image: macOS lo tiñe según el modo claro/oscuro de la barra.
+            // Template image: macOS tints it to match the menu bar's light/dark mode.
             Image("MenuBarIcon")
                 .accessibilityLabel("LevelDeck")
         }
-        // El estilo menú no admite sliders (SPEC §5.1).
+        // The menu style doesn't support sliders (SPEC §5.1).
         .menuBarExtraStyle(.window)
 
         Window("Pair a New Device", id: PairingWindowView.windowID) {

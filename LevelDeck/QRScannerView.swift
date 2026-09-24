@@ -2,7 +2,7 @@ import AVFoundation
 import SwiftUI
 import UIKit
 
-/// Vista previa de la cámara que entrega el primer QR que lee (SPEC §7, AVFoundation).
+/// Camera preview that delivers the first QR code it reads (SPEC §7, AVFoundation).
 struct QRScannerView: UIViewRepresentable {
     let onCode: @MainActor (String) -> Void
 
@@ -28,7 +28,7 @@ final class ScannerPreview: UIView {
     override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
 
     var previewLayer: AVCaptureVideoPreviewLayer {
-        // `layerClass` garantiza el tipo.
+        // `layerClass` guarantees the type.
         layer as! AVCaptureVideoPreviewLayer
     }
 
@@ -44,13 +44,13 @@ final class ScannerPreview: UIView {
     }
 }
 
-/// Maneja la `AVCaptureSession` en su propia cola; los QR llegan en la principal.
+/// Runs the `AVCaptureSession` on its own queue; QR codes arrive on the main one.
 final class ScannerController: NSObject, AVCaptureMetadataOutputObjectsDelegate, @unchecked Sendable {
     @MainActor var onCode: (@MainActor (String) -> Void)?
 
     private let session = AVCaptureSession()
     private let sessionQueue = DispatchQueue(label: "com.renandiaz.LevelDeck.scanner")
-    /// Un QR se entrega una sola vez por sesión de escaneo.
+    /// A QR code is delivered only once per scanning session.
     private var didDeliver = false
 
     @MainActor
@@ -96,7 +96,7 @@ final class ScannerController: NSObject, AVCaptureMetadataOutputObjectsDelegate,
             .first { $0.type == .qr }?
             .stringValue
         guard let text else { return }
-        // El delegate está registrado con la cola principal.
+        // The delegate is registered with the main queue.
         MainActor.assumeIsolated {
             guard !didDeliver else { return }
             didDeliver = true

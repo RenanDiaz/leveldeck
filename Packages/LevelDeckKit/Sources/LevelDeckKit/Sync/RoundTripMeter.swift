@@ -1,5 +1,5 @@
-/// Mide el tiempo desde un `setVolume` hasta el `state` que lo refleja. Alimenta el overlay
-/// de debug del iPhone para verificar la latencia en la red local.
+/// Measures the time from a `setVolume` to the `state` that reflects it. Feeds the iPhone's
+/// debug overlay to verify latency on the local network.
 public struct RoundTripMeter: Sendable {
     public static let sampleLimit = 20
     private static let pendingLimit = 64
@@ -28,8 +28,8 @@ public struct RoundTripMeter: Sendable {
         }
     }
 
-    /// Registra un volumen recibido. Si corresponde a un envío pendiente, devuelve el RTT y
-    /// descarta ese envío y los anteriores del mismo scope.
+    /// Records a received volume. If it matches a pending send, returns the RTT and
+    /// discards that send and earlier ones for the same scope.
     @discardableResult
     public mutating func didReceive(
         volume: Float, scope: Scope, at instant: ContinuousClock.Instant

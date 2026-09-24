@@ -2,9 +2,9 @@ import AgentAudio
 import LevelDeckKit
 import Testing
 
-/// Lista de dispositivos, selección y conexión en caliente (Fase 4), con el mock de
-/// `AudioControlling`. El filtro de ocultos y de streams por scope vive en CoreAudio y se
-/// verifica a mano (SPEC §11).
+/// Device list, selection and hot-plugging (Phase 4), using the mock of
+/// `AudioControlling`. Filtering hidden devices and per-scope streams lives in CoreAudio and
+/// is verified by hand (SPEC §11).
 @MainActor
 @Suite("Dispositivos")
 struct DeviceSelectionTests {
@@ -26,7 +26,7 @@ struct DeviceSelectionTests {
         model.devices(scope).map(\.id)
     }
 
-    // MARK: - Lista
+    // MARK: - List
 
     @Test func startLoadsDeviceListsPerScope() {
         #expect(ids(.output) == ["HDMIDisplay", "BuiltInSpeakerDevice"], "Ordenados por nombre")
@@ -96,7 +96,7 @@ struct DeviceSelectionTests {
         #expect(model.channel(.output) == .speakers)
     }
 
-    // MARK: - Selección
+    // MARK: - Selection
 
     @Test("Elegir un dispositivo lo vuelve el default", arguments: Scope.allCases)
     func selectingMakesItTheDefault(scope: Scope) {
@@ -126,7 +126,7 @@ struct DeviceSelectionTests {
         #expect(model.channel(.input) == .microphone)
     }
 
-    /// El cliente vio la lista, el dispositivo se desconectó y la HAL todavía no avisó.
+    /// The client saw the list, the device was disconnected and the HAL hasn't notified yet.
     @Test func deviceGoneBetweenListAndTapResyncsTheList() {
         mock.removeWithoutNotifying("HDMIDisplay")
         #expect(ids(.output).contains("HDMIDisplay"), "El modelo todavía no se enteró")
@@ -145,7 +145,7 @@ struct DeviceSelectionTests {
         #expect(model.channel(.output)?.volume == 0.2)
     }
 
-    // MARK: - Configurabilidad independiente
+    // MARK: - Independent settability
 
     @Test func muteWithoutVolumeKeepsMuteUsable() {
         mock.simulatePlug(.display)

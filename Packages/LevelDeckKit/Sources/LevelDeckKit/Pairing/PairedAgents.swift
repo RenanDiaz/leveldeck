@@ -1,12 +1,12 @@
 import Foundation
 import Observation
 
-/// Macs emparejadas, del lado del iPhone (SPEC §7): guarda la clave del QR y la olvida.
+/// Paired Macs, on the iPhone side (SPEC §7): stores the key from the QR and forgets it.
 @MainActor
 @Observable
 public final class PairedAgents {
     public private(set) var agents: [PairedAgent] = []
-    /// Último fallo del Keychain. La app lo muestra localizado.
+    /// Last Keychain failure. The app shows it localized.
     public private(set) var storeError: PairingStoreError?
 
     private let store: any PairedAgentStore
@@ -24,8 +24,8 @@ public final class PairedAgents {
         agents.first { $0.id == id }
     }
 
-    /// Guarda la clave del QR. Volver a escanear un QR de la misma Mac reemplaza la entrada:
-    /// la Mac tendrá una identidad vieja huérfana hasta que se revoque desde su menú.
+    /// Stores the key from the QR. Scanning a QR from the same Mac again replaces the entry:
+    /// the Mac will keep an orphaned old identity until it is revoked from its menu.
     @discardableResult
     public func pair(with code: PairingCode) throws -> PairedAgent {
         let agent = PairedAgent(code: code)
@@ -36,7 +36,7 @@ public final class PairedAgents {
         return agent
     }
 
-    /// Olvida la Mac. La Mac sigue teniendo la identidad hasta que se revoque desde su menú.
+    /// Forgets the Mac. The Mac keeps the identity until it is revoked from its menu.
     public func forget(id: String) {
         do {
             try store.removeAgent(id: id)

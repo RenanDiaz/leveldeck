@@ -1,38 +1,38 @@
 import LevelDeckKit
 import Observation
 
-/// Estado del mixer conectado a un agente.
+/// State of the mixer connected to an agent.
 ///
-/// Arma la sincronización del fader (SPEC §6.2): cada fader envía como máximo 30 `setVolume`
-/// por segundo y siempre el valor final al soltar; mientras se arrastra, y ~300 ms después,
-/// los `state` entrantes no mueven su volumen (`MixerState`). Si otro cliente o la Mac cambian
-/// el dispositivo a mitad del arrastre, ese arrastre deja de enviar.
+/// Implements fader sync (SPEC §6.2): each fader sends at most 30 `setVolume` per
+/// second and always the final value on release; while dragging, and for ~300 ms after,
+/// incoming `state` messages don't move its volume (`MixerState`). If another client or the Mac
+/// changes the device mid-drag, that drag stops sending.
 ///
-/// Feedback háptico ligero al llegar a 0 % o 100 % arrastrando y al tocar el mute: solo por
-/// acciones propias, no por lo que llega de otro cliente o de la Mac (SPEC §6.2).
+/// Light haptic feedback when dragging reaches 0 % or 100 % and when tapping mute: only for
+/// the user's own actions, not for changes from another client or the Mac (SPEC §6.2).
 @MainActor
 @Observable
 final class MixerModel {
     let agentName: String
     let client: LevelDeckClient
     private(set) var mixer = MixerState()
-    /// RTT de `setVolume` → `state` para el overlay de debug.
+    /// `setVolume` → `state` RTT for the debug overlay.
     private(set) var roundTrip = RoundTripMeter()
 
-    /// Último error del agente, para mostrarlo un momento. Se borra solo: el estado ya se
-    /// resincronizó con el agente, así que no queda nada que el usuario tenga que resolver.
+    /// Latest error from the agent, shown briefly. It clears itself: the state has already
+    /// resynced with the agent, so there is nothing left for the user to resolve.
     private(set) var notice: AgentError?
 
-    /// Cambia con cada evento háptico; la vista lo usa como disparador de `sensoryFeedback`.
+    /// Changes with every haptic event; the view uses it as the `sensoryFeedback` trigger.
     private(set) var hapticTick = 0
 
-    /// La Mac revocó este iPhone (`error` `notPaired`, SPEC §7): la clave ya no sirve.
+    /// The Mac revoked this iPhone (`error` `notPaired`, SPEC §7): the key no longer works.
     @ObservationIgnored var onUnpaired: (@MainActor () -> Void)?
 
     @ObservationIgnored private var senders: [Scope: ThrottledSender<Float>] = [:]
     @ObservationIgnored private var settleTasks: [Scope: Task<Void, Never>] = [:]
     @ObservationIgnored private var noticeTask: Task<Void, Never>?
-    /// Último valor del arrastre en curso, para detectar la llegada a un borde.
+    /// Last value of the drag in progress, to detect reaching an edge.
     @ObservationIgnored private var lastDragValue: [Scope: Float] = [:]
 
     init(agentName: String, client: LevelDeckClient) {
@@ -55,7 +55,7 @@ final class MixerModel {
         mixer[scope]
     }
 
-    /// Dispositivos que la Mac ofrece para el scope, según el último `state`.
+    /// Devices the Mac offers for the scope, according to the latest `state`.
     func devices(_ scope: Scope) -> [DeviceInfo] {
         mixer.devices[scope]
     }
@@ -68,13 +68,13 @@ final class MixerModel {
         client.disconnect()
     }
 
-    /// La app pasó a segundo plano: se cierra la conexión y se pausan los reintentos. iOS
-    /// suspende la app y el socket moriría igual; así la Mac ve el cierre al instante.
+    /// The app went to the background: the connection is closed and retries are paused. iOS
+    /// suspends the app and the socket would die anyway; this way the Mac sees the close instantly.
     func suspend() {
         client.disconnect()
     }
 
-    /// La app volvió al frente: reconexión inmediata, sin esperar el backoff.
+    /// The app came back to the foreground: reconnect immediately, without waiting for the backoff.
     func resume() {
         client.reconnectNow()
     }
@@ -89,7 +89,7 @@ final class MixerModel {
     }
 
     func dragChanged(_ scope: Scope, to value: Float) {
-        // Si cambió el dispositivo a mitad del arrastre, manda el agente hasta el próximo toque.
+        // If the device changed mid-drag, the agent wins until the next touch.
         guard mixer.acceptsDrag(scope) else { return }
         mixer.drag(scope, to: value)
         senders[scope]?.submit(value)
@@ -121,16 +121,16 @@ final class MixerModel {
         hapticTick += 1
     }
 
-    // MARK: - Dispositivo
+    // MARK: - Device
 
-    /// Pide a la Mac que ese dispositivo sea el default. Sin optimismo: el cambio se ve cuando
-    /// llega el `state`, y si el dispositivo ya no existe llega `deviceNotFound`.
+    /// Asks the Mac to make that device the default. Not optimistic: the change shows up when
+    /// the `state` arrives, and if the device no longer exists `deviceNotFound` arrives.
     func selectDevice(_ deviceId: String, scope: Scope) {
         guard isConnected, mixer[scope]?.deviceId != deviceId else { return }
         client.send(.setDefaultDevice(scope: scope, deviceId: deviceId))
     }
 
-    // MARK: - Red
+    // MARK: - Network
 
     private func sendVolume(_ value: Float, scope: Scope) {
         if client.send(.setVolume(scope: scope, value: value)) {
@@ -150,18 +150,18 @@ final class MixerModel {
             mixer.apply(snapshot, now: now)
             cancelInvalidatedDrags()
         case .challenge:
-            // El cliente lo consume y no lo publica; no llega aquí.
+            // The client consumes it and doesn't publish it; it never gets here.
             break
         case .error(.notPaired, _):
             onUnpaired?()
         case let .error(code, message):
-            // El comando no se aplicó: volver a lo último que dijo el agente.
+            // The command wasn't applied: revert to the last thing the agent said.
             mixer.resync(now: now)
             show(AgentError(code, message))
         }
     }
 
-    /// Un arrastre invalidado no puede dejar un `setVolume` programado para el dispositivo nuevo.
+    /// An invalidated drag must not leave a `setVolume` scheduled for the new device.
     private func cancelInvalidatedDrags() {
         for scope in Scope.allCases where !mixer.acceptsDrag(scope) {
             senders[scope]?.cancel()

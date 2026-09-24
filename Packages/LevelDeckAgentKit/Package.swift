@@ -1,7 +1,7 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
-// Solo macOS: lógica de audio del agente (SPEC §5.2).
+// macOS only: the agent's audio logic (SPEC §5.2).
 let package = Package(
     name: "LevelDeckAgentKit",
     platforms: [.macOS(.v14)],
@@ -13,9 +13,9 @@ let package = Package(
         .package(path: "../LevelDeckKit"),
     ],
     targets: [
-        // Lógica de estado, sin CoreAudio. Se prueba con un mock de `AudioControlling`.
+        // State logic, without CoreAudio. Tested with a mock of `AudioControlling`.
         .target(name: "AgentAudio", dependencies: ["LevelDeckKit"]),
-        // Implementación real. Se verifica a mano contra el hardware (SPEC §11).
+        // Real implementation. Verified by hand against the hardware (SPEC §11).
         .target(name: "AgentCoreAudio", dependencies: ["AgentAudio", "LevelDeckKit"]),
         .testTarget(name: "AgentAudioTests", dependencies: ["AgentAudio", "LevelDeckKit"]),
     ]

@@ -1,8 +1,8 @@
 import Foundation
 @preconcurrency import Network
 
-/// Reloj manual: las esperas solo terminan cuando el test avanza el tiempo. Sirve para probar
-/// el backoff sin dormir de verdad.
+/// Manual clock: sleeps only finish when the test advances time. Used to test
+/// the backoff without actually sleeping.
 final class ManualClock: Clock, @unchecked Sendable {
     struct Instant: InstantProtocol {
         var offset: Swift.Duration
@@ -29,13 +29,13 @@ final class ManualClock: Clock, @unchecked Sendable {
     private let lock = NSLock()
     private var current = Instant(offset: .zero)
     private var sleepers: [Sleeper] = []
-    /// Esperas canceladas antes de registrarse.
+    /// Sleeps cancelled before registering.
     private var cancelled: Set<UUID> = []
 
     var now: Instant { lock.withLock { current } }
     var minimumResolution: Swift.Duration { .zero }
 
-    /// Esperas en curso.
+    /// Sleeps in progress.
     var sleeperCount: Int { lock.withLock { sleepers.count } }
 
     func sleep(until deadline: Instant, tolerance: Swift.Duration? = nil) async throws {
@@ -64,7 +64,7 @@ final class ManualClock: Clock, @unchecked Sendable {
         }
     }
 
-    /// Avanza el tiempo y despierta las esperas vencidas.
+    /// Advances time and wakes the expired sleeps.
     func advance(by duration: Swift.Duration) {
         let due: [Sleeper] = lock.withLock {
             current = current.advanced(by: duration)
@@ -78,7 +78,7 @@ final class ManualClock: Clock, @unchecked Sendable {
     }
 }
 
-/// Un puerto de loopback sin nadie escuchando: se reserva con un socket y se libera enseguida.
+/// A loopback port with nobody listening: reserved with a socket and released right away.
 func unusedLoopbackPort() throws -> NWEndpoint.Port {
     let descriptor = socket(AF_INET, SOCK_STREAM, 0)
     guard descriptor >= 0 else { throw TimeoutError(description: "socket() falló") }
@@ -102,7 +102,7 @@ func unusedLoopbackPort() throws -> NWEndpoint.Port {
     return port
 }
 
-/// Deja correr las tareas pendientes del main actor sin avanzar ningún reloj.
+/// Lets pending main actor tasks run without advancing any clock.
 @MainActor
 func settle() async {
     for _ in 0..<20 {

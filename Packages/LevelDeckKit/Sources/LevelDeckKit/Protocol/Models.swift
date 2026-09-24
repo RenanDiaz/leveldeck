@@ -1,21 +1,21 @@
-/// Lado del audio al que aplica un mensaje.
+/// Audio side a message applies to.
 public enum Scope: String, Codable, Sendable, CaseIterable {
     case output
     case input
 }
 
-/// Estado del dispositivo por defecto de un `Scope`.
+/// State of the default device for a `Scope`.
 public struct ChannelState: Codable, Sendable, Equatable {
-    /// UID del dispositivo (`kAudioDevicePropertyDeviceUID`), estable entre reinicios.
+    /// Device UID (`kAudioDevicePropertyDeviceUID`), stable across restarts.
     public var deviceId: String
     public var deviceName: String
-    /// Normalizado en 0.0–1.0.
+    /// Normalized to 0.0–1.0.
     public var volume: Float
     public var muted: Bool
-    /// `false` si el dispositivo no permite cambiar el volumen (p. ej. HDMI).
+    /// `false` if the device does not allow changing the volume (e.g. HDMI).
     public var volumeSettable: Bool
-    /// `false` si el dispositivo no permite cambiar el mute. Se evalúa aparte del volumen:
-    /// hay dispositivos con uno y sin el otro.
+    /// `false` if the device does not allow changing mute. Evaluated separately from volume:
+    /// some devices have one without the other.
     public var muteSettable: Bool
 
     public init(
@@ -32,7 +32,7 @@ public struct ChannelState: Codable, Sendable, Equatable {
 }
 
 public struct DeviceInfo: Codable, Sendable, Equatable {
-    /// UID del dispositivo.
+    /// Device UID.
     public var id: String
     public var name: String
 
@@ -67,11 +67,11 @@ public struct DeviceList: Codable, Sendable, Equatable {
     }
 }
 
-/// Snapshot completo que el agente envía en cada mensaje `state`.
+/// Full snapshot the agent sends in every `state` message.
 public struct StateSnapshot: Codable, Sendable, Equatable {
-    /// `nil` si no hay dispositivo de salida por defecto. En el cable viaja como `null`.
+    /// `nil` if there is no default output device. On the wire it travels as `null`.
     public var output: ChannelState?
-    /// `nil` si no hay dispositivo de entrada por defecto (p. ej. un Mac mini sin micrófono).
+    /// `nil` if there is no default input device (e.g. a Mac mini without a microphone).
     public var input: ChannelState?
     public var devices: DeviceList
 
@@ -102,6 +102,6 @@ public enum ErrorCode: String, Codable, Sendable, CaseIterable {
     case notSettable
     case deviceNotFound
     case invalidValue
-    /// El dispositivo no está emparejado (o se revocó): el agente cierra la sesión (SPEC §7).
+    /// The device is not paired (or was revoked): the agent closes the session (SPEC §7).
     case notPaired
 }

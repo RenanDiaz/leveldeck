@@ -1,8 +1,8 @@
 import AgentAudio
 import LevelDeckKit
 
-/// Simula el sistema de audio: dispositivos conectados, el dispositivo por defecto de cada
-/// scope y, como la HAL real, avisa del cambio después de cada escritura exitosa.
+/// Simulates the audio system: connected devices, the default device for each
+/// scope and, like the real HAL, notifies of the change after each successful write.
 @MainActor
 final class MockAudioController: AudioControlling {
     struct VolumeCall: Equatable {
@@ -20,7 +20,7 @@ final class MockAudioController: AudioControlling {
         let scope: Scope
     }
 
-    /// Un dispositivo conectado, con su canal en cada scope donde tiene streams.
+    /// A connected device, with its channel in each scope where it has streams.
     struct Device {
         var channels: [Scope: AudioChannel]
 
@@ -31,9 +31,9 @@ final class MockAudioController: AudioControlling {
         }
     }
 
-    /// Canal por defecto del "sistema". Sin clave = no hay dispositivo por defecto.
+    /// Default channel of the "system". No key = no default device.
     var system: [Scope: AudioChannel]
-    /// Dispositivos conectados, en orden de conexión.
+    /// Connected devices, in connection order.
     var connected: [Device]
     var readError: AudioControlError?
     var listError: AudioControlError?
@@ -48,7 +48,7 @@ final class MockAudioController: AudioControlling {
 
     var isObserving: Bool { onChange != nil }
 
-    /// Por defecto, cada canal de `system` es también un dispositivo conectado en su scope.
+    /// By default, each channel in `system` is also a connected device in its scope.
     init(system: [Scope: AudioChannel] = [.output: .speakers, .input: .microphone], connected: [Device]? = nil) {
         self.system = system
         self.connected = connected ?? Scope.allCases.compactMap { scope in
@@ -104,20 +104,20 @@ final class MockAudioController: AudioControlling {
         onChange = nil
     }
 
-    /// Cambio hecho fuera del agente (teclado, Ajustes del Sistema, otro dispositivo).
+    /// Change made outside the agent (keyboard, System Settings, another device).
     func simulateExternalChange(_ scope: Scope, _ change: (inout [Scope: AudioChannel]) -> Void) {
         change(&system)
         onChange?(scope)
     }
 
-    /// Se conecta un dispositivo en caliente. macOS no cambia el default por eso.
+    /// A device is hot-plugged. macOS doesn't change the default because of it.
     func simulatePlug(_ device: Device) {
         connected.append(device)
         notifyListChanged()
     }
 
-    /// Se desconecta un dispositivo en caliente. Si era el activo de un scope, macOS elige
-    /// el primero que queda conectado en ese scope (o ninguno).
+    /// A device is hot-unplugged. If it was the active one for a scope, macOS picks
+    /// the first one still connected in that scope (or none).
     func simulateUnplug(_ deviceId: String) {
         removeWithoutNotifying(deviceId)
         for scope in Scope.allCases where system[scope]?.deviceId == deviceId {
@@ -126,22 +126,22 @@ final class MockAudioController: AudioControlling {
         notifyListChanged()
     }
 
-    /// El dispositivo desaparece y la HAL todavía no avisó: la carrera entre la lista que vio
-    /// el cliente y su toque.
+    /// The device disappears and the HAL hasn't notified yet: the race between the list the
+    /// client saw and its tap.
     func removeWithoutNotifying(_ deviceId: String) {
         for scope in Scope.allCases { saveDefault(scope) }
         connected.removeAll { $0.id == deviceId }
     }
 
-    /// Como la HAL: un cambio en `kAudioHardwarePropertyDevices` llega para ambos scopes.
+    /// Like the HAL: a change in `kAudioHardwarePropertyDevices` arrives for both scopes.
     private func notifyListChanged() {
         for scope in Scope.allCases {
             onChange?(scope)
         }
     }
 
-    /// Guarda en su dispositivo el estado del canal activo, para que al volver a elegirlo
-    /// conserve volumen y mute.
+    /// Stores the active channel's state in its device, so that when it is selected again
+    /// it keeps its volume and mute.
     private func saveDefault(_ scope: Scope) {
         guard let current = system[scope],
               let index = connected.firstIndex(where: { $0.id == current.deviceId }) else { return }
@@ -166,7 +166,7 @@ extension AudioChannel {
         deviceId: "AppleUSBAudioEngine:Focusrite:Scarlett", deviceName: "Scarlett 2i2",
         volume: 0.5, muted: false, volumeSettable: true, muteSettable: false
     )
-    /// Pantalla con audio por HDMI: mute, pero sin volumen.
+    /// Display with HDMI audio: mute, but no volume.
     static let displayMuteOnly = AudioChannel(
         deviceId: "DisplayPortAudio", deviceName: "Studio Display",
         volume: 1, muted: false, volumeSettable: false, muteSettable: true
@@ -179,7 +179,7 @@ extension AudioChannel {
         deviceId: "BluetoothHeadset", deviceName: "AirPods Pro",
         volume: 0.7, muted: false, volumeSettable: true, muteSettable: true
     )
-    /// Dispositivo virtual (tipo BlackHole): solo lo que diga la HAL de sus streams.
+    /// Virtual device (BlackHole-style): only what the HAL reports about its streams.
     static let virtualLoopback = AudioChannel(
         deviceId: "BlackHole2ch_UID", deviceName: "BlackHole 2ch",
         volume: 1, muted: false, volumeSettable: false, muteSettable: false

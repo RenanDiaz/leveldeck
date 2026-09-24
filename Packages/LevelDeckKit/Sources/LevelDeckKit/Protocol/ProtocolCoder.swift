@@ -1,6 +1,6 @@
 import Foundation
 
-/// Codificación JSON única para el protocolo, para que ambos lados usen la misma configuración.
+/// Single JSON coding for the protocol, so both sides use the same configuration.
 public enum ProtocolCoder {
     public static func encode(_ message: some Encodable) throws -> Data {
         let encoder = JSONEncoder()

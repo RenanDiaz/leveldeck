@@ -3,14 +3,14 @@ import AudioToolbox
 import CoreAudio
 import LevelDeckKit
 
-/// Cómo se controla el volumen de un dispositivo en un scope (SPEC §5.2).
+/// How a device's volume is controlled in a scope (SPEC §5.2).
 ///
-/// Orden de preferencia: volumen virtual principal, `VolumeScalar` en el elemento principal
-/// y, por último, `VolumeScalar` canal por canal. Se usa la primera opción configurable; si
-/// ninguna lo es, la primera que exista queda como solo lectura.
+/// Order of preference: virtual main volume, `VolumeScalar` on the main element
+/// and, lastly, per-channel `VolumeScalar`. The first settable option is used; if
+/// none is, the first one that exists is kept as read-only.
 struct VolumeControl {
-    /// Propiedades que representan el volumen. Con varias (una por canal), se leen
-    /// promediadas y se escriben todas con el mismo valor.
+    /// Properties that represent the volume. With several (one per channel), they are read
+    /// averaged and all written with the same value.
     let addresses: [AudioObjectPropertyAddress]
     let isSettable: Bool
 
@@ -39,7 +39,7 @@ struct VolumeControl {
         return .none
     }
 
-    /// Volumen normalizado. Un dispositivo sin control de volumen se reporta en 0.
+    /// Normalized volume. A device without a volume control reports 0.
     func read(_ device: AudioObjectID) throws(AudioControlError) -> Float {
         guard !addresses.isEmpty else { return 0 }
         var total: Float32 = 0

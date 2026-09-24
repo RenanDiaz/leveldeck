@@ -76,7 +76,7 @@ struct PairingCodeTests {
     }
 }
 
-/// `authorize` sin red: la política del `hello` (SPEC §7).
+/// `authorize` without network: the `hello` policy (SPEC §7).
 @MainActor
 @Suite("PairingManager")
 struct PairingManagerTests {
@@ -125,7 +125,7 @@ struct PairingManagerTests {
         #expect(manager.lastPaired?.name == "iPhone de Renan")
         #expect(try store.loadDevices().map(\.key) == [code.key])
 
-        // Ya emparejado: vuelve a entrar como conocido, sin duplicar.
+        // Already paired: comes back in as known, without duplicating.
         #expect(manager.authorize(deviceId: code.deviceID, deviceName: "iPhone de Renan"))
         #expect(manager.devices.count == 1)
     }

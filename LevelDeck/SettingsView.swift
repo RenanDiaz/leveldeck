@@ -1,7 +1,7 @@
 import LevelDeckKit
 import SwiftUI
 
-/// Ajustes (SPEC §6.1): Macs emparejadas con opción de olvidar, y versión.
+/// Settings (SPEC §6.1): paired Macs with an option to forget them, and the version.
 struct SettingsView: View {
     let pairedAgents: PairedAgents
 

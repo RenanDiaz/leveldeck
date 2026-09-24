@@ -1,19 +1,19 @@
 import AppKit
 @preconcurrency import Network
 
-/// Eventos del sistema que obligan a volver a anunciarse (SPEC §5.3, Fase 5): despertar de
-/// la Mac y cambios de red (Wi-Fi apagado y encendido, otra red, otra interfaz).
+/// System events that require re-advertising (SPEC §5.3, Phase 5): the Mac waking
+/// up and network changes (Wi-Fi off and on, another network, another interface).
 ///
-/// Al despertar, el agente reinicia el listener (re-anuncio por Bonjour) y vuelve a suscribir
-/// los listeners de CoreAudio. Al cambiar la red, solo reinicia el listener. Las sesiones
-/// activas no se tocan: las muertas las detecta el keepalive de TCP.
+/// On wake, the agent restarts the listener (Bonjour re-advertisement) and resubscribes
+/// the CoreAudio listeners. On a network change, it only restarts the listener. Active
+/// sessions are left alone: dead ones are detected by TCP keepalive.
 @MainActor
 final class SystemEvents {
     private let onWake: @MainActor () -> Void
     private let onNetworkChange: @MainActor () -> Void
     private let pathMonitor = NWPathMonitor()
     private var wakeObserver: (any NSObjectProtocol)?
-    /// Última ruta vista, para reaccionar solo a cambios reales.
+    /// Last path seen, to react only to real changes.
     private var lastPath: PathSummary?
 
     private struct PathSummary: Equatable {
@@ -45,7 +45,7 @@ final class SystemEvents {
 
     private func pathChanged(_ path: PathSummary) {
         defer { lastPath = path }
-        // La primera ruta llega al arrancar: no es un cambio.
+        // The first path arrives at startup: it isn't a change.
         guard let lastPath, lastPath != path, path.satisfied else { return }
         onNetworkChange()
     }

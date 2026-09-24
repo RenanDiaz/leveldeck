@@ -3,8 +3,8 @@ import Foundation
 import Testing
 @testable import LevelDeckKit
 
-/// Contra el Keychain real (llavero de login), con un servicio único por test. El resto de
-/// los tests usa los stores en memoria; este cubre las consultas `SecItem*` en sí (SPEC §7.3).
+/// Against the real Keychain (login keychain), with a unique service per test. The rest of
+/// the tests use the in-memory stores; this one covers the `SecItem*` queries themselves (SPEC §7.3).
 @MainActor
 @Suite("KeychainPairedDeviceStore")
 struct KeychainStoreTests {
@@ -23,7 +23,7 @@ struct KeychainStoreTests {
         )
     }
 
-    /// Borra todo lo que el test pudo haber creado, aunque haya fallado a la mitad.
+    /// Deletes everything the test may have created, even if it failed halfway.
     func cleanUp(deviceIDs: [String]) {
         for id in deviceIDs {
             try? store.removeDevice(id: id)

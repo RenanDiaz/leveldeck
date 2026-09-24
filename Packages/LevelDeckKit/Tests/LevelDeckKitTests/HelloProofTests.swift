@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import LevelDeckKit
 
-/// Challenge-response del `hello` (SPEC §8), sin red.
+/// `hello` challenge-response (SPEC §8), without network.
 @Suite("HelloProof")
 struct HelloProofTests {
     let key = TestKeys.key(1)
@@ -14,8 +14,8 @@ struct HelloProofTests {
         #expect(HelloProof.verify(proof, nonce: nonce, deviceId: "dev-1", key: key))
     }
 
-    /// Vector fijo: cualquier cambio en la etiqueta, el orden o el algoritmo rompe la
-    /// compatibilidad entre el agente y el cliente, y este test lo detecta.
+    /// Fixed vector: any change to the label, the order or the algorithm breaks
+    /// compatibility between agent and client, and this test catches it.
     @Test func matchesKnownVector() {
         let proof = HelloProof.sign(nonce: nonce, deviceId: "dev-1", key: key)
         #expect(proof.base64URLEncodedString() == HelloProofTests.knownVector)
@@ -50,6 +50,6 @@ struct HelloProofTests {
         #expect(first != second)
     }
 
-    /// HMAC-SHA256(0x01 × 32, "leveldeck-hello-v3\0" ‖ 0x42 × 32 ‖ "dev-1"), en base64url.
+    /// HMAC-SHA256(0x01 × 32, "leveldeck-hello-v3\0" ‖ 0x42 × 32 ‖ "dev-1"), in base64url.
     static let knownVector = "0RKyAGbcABiekDbqXYy14MqAcYw9cwAsZmfdov6YuK4"
 }

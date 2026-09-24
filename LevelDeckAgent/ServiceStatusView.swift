@@ -1,8 +1,8 @@
 import LevelDeckKit
 import SwiftUI
 
-/// Estado del servicio de red en el menú: nombre anunciado, puerto y clientes conectados.
-/// La conexión va siempre por TLS-PSK (SPEC §5.3).
+/// Network service status in the menu: advertised name, port and connected clients.
+/// The connection always uses TLS-PSK (SPEC §5.3).
 struct ServiceStatusView: View {
     let server: LevelDeckServer
 
@@ -41,7 +41,7 @@ struct ServiceStatusView: View {
         }
     }
 
-    /// Detalle técnico del problema de red, si hay.
+    /// Technical detail of the network problem, if any.
     private var issue: NetworkIssue? {
         switch server.status {
         case let .waiting(issue), let .failed(issue): issue

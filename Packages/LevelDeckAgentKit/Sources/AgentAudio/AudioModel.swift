@@ -1,22 +1,22 @@
 import LevelDeckKit
 import Observation
 
-/// Estado de audio observable que consume la UI del agente.
+/// Observable audio state consumed by the agent's UI.
 ///
-/// Es la única fuente de verdad del lado de la Mac: tanto las acciones del menú como los
-/// cambios externos (teclado, Ajustes del Sistema, cambio de dispositivo) terminan aquí.
+/// It is the single source of truth on the Mac side: both menu actions and
+/// external changes (keyboard, System Settings, device change) end up here.
 @MainActor
 @Observable
 public final class AudioModel {
-    /// Canal por scope. Si falta la clave, no hay dispositivo por defecto para ese scope.
+    /// Channel per scope. If the key is missing, there is no default device for that scope.
     public private(set) var channels: [Scope: AudioChannel] = [:]
-    /// Dispositivos que se pueden elegir, por scope.
+    /// Selectable devices, per scope.
     public private(set) var deviceLists: [Scope: [DeviceInfo]] = [:]
-    /// Último error de una lectura o escritura. Se limpia con la siguiente operación exitosa.
+    /// Last error from a read or write. Cleared by the next successful operation.
     public private(set) var lastError: AudioControlError?
 
-    /// Se llama después de cada lectura o escritura exitosa, venga del menú, de un cliente
-    /// remoto o de fuera. El servidor la usa para enviar `state`; él mismo descarta repetidos.
+    /// Called after every successful read or write, whether from the menu, a remote
+    /// client or outside. The server uses it to send `state`; it drops duplicates itself.
     @ObservationIgnored public var onChange: (@MainActor () -> Void)?
 
     private let controller: any AudioControlling
@@ -42,7 +42,7 @@ public final class AudioModel {
         channels[scope]?.muteSettable ?? false
     }
 
-    /// Lee ambos scopes y empieza a escuchar cambios. Idempotente.
+    /// Reads both scopes and starts listening for changes. Idempotent.
     public func start() {
         guard !isRunning else { return }
         isRunning = true
@@ -54,9 +54,9 @@ public final class AudioModel {
         }
     }
 
-    /// Vuelve a suscribir los listeners y relee ambos scopes. Se usa al despertar la Mac: los
-    /// dispositivos pueden haber cambiado mientras dormía (SPEC §5.2). Si no estaba corriendo,
-    /// arranca.
+    /// Resubscribes the listeners and rereads both scopes. Used when the Mac wakes: the
+    /// devices may have changed while it was asleep (SPEC §5.2). If it wasn't running,
+    /// it starts.
     public func restart() {
         guard isRunning else {
             start()
@@ -77,10 +77,10 @@ public final class AudioModel {
         controller.stopObserving()
     }
 
-    /// Relee la lista de dispositivos y el canal de un scope. Son lecturas independientes: si
-    /// una falla, conserva su último valor y la otra se aplica igual. Al desconectar el
-    /// dispositivo activo, la HAL puede fallar un instante al leer el default viejo, y la
-    /// lista tiene que actualizarse de todas formas.
+    /// Rereads a scope's device list and channel. They are independent reads: if
+    /// one fails, it keeps its last value and the other is applied anyway. When the active
+    /// device is disconnected, the HAL may briefly fail to read the old default, and the
+    /// list has to be updated regardless.
     public func refresh(_ scope: Scope) {
         var failure: AudioControlError?
         var readAny = false
@@ -136,8 +136,8 @@ public final class AudioModel {
         }
     }
 
-    /// Cambia el dispositivo por defecto del scope. Elegir el que ya está activo no hace nada.
-    /// Si falla (p. ej. el dispositivo se desconectó), se resincroniza la lista con el sistema.
+    /// Changes the scope's default device. Selecting the one already active does nothing.
+    /// If it fails (e.g. the device was disconnected), the list is resynced with the system.
     public func setDefaultDevice(_ deviceId: String, scope: Scope) {
         guard channels[scope]?.deviceId != deviceId else {
             lastError = nil
@@ -145,12 +145,12 @@ public final class AudioModel {
         }
         perform(scope) { () throws(AudioControlError) in
             try controller.setDefaultDevice(deviceId, scope: scope)
-            // Leer el canal nuevo ya, sin esperar al listener (que llega después y no cambia nada).
+            // Read the new channel now; the listener arrives later and changes nothing.
             refresh(scope)
         }
     }
 
-    /// Ejecuta una escritura. Si falla, registra el error y resincroniza con el sistema.
+    /// Performs a write. If it fails, records the error and resyncs with the system.
     private func perform(_ scope: Scope, _ write: () throws(AudioControlError) -> Void) {
         do throws(AudioControlError) {
             try write()

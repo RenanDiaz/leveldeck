@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
-# Verifica build y tests automáticos. Requiere macOS con Xcode 16+ y XcodeGen.
+# Verifies the build and automated tests. Requires macOS with Xcode 16+ and XcodeGen.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 DERIVED_DATA=build/DerivedData
 PRODUCTS="$DERIVED_DATA/Build/Products"
 KIT_BUILD=Packages/LevelDeckKit/.build
-# Marca del transporte en claro: el nombre del caso de TransportSecurity (SPEC §5.3).
+# Plaintext transport marker: the name of the TransportSecurity case (SPEC §5.3).
 INSECURE_MARKER=insecurePlaintext
 
 echo "==> xcodegen generate"
 xcodegen generate
 
-echo "==> Tests de LevelDeckKit (incluye integración en loopback con TLS-PSK)"
+echo "==> LevelDeckKit tests (includes loopback integration with TLS-PSK)"
 swift test --package-path Packages/LevelDeckKit
 
-echo "==> Tests de LevelDeckAgentKit"
+echo "==> LevelDeckAgentKit tests"
 swift test --package-path Packages/LevelDeckAgentKit
 
 build() {
@@ -32,25 +32,25 @@ for configuration in Debug Release; do
   build LevelDeck 'generic/platform=iOS Simulator' "$configuration"
 done
 
-# El transporte en claro existe solo en el build Debug de LevelDeckKit (donde corren los
-# tests) y no puede existir en las apps Release. El chequeo del build Debug del paquete es el
-# control positivo: prueba que la marca sería visible si el código estuviera compilado.
+# The plaintext transport exists only in LevelDeckKit's Debug build (where the tests run)
+# and must not exist in the Release apps. The check on the package's Debug build is the
+# positive control: it proves the marker would be visible if the code were compiled in.
 check_insecure_transport() {
   local what=$1 path=$2 expected=$3
   if grep -rqa "$INSECURE_MARKER" "$path"; then found=yes; else found=no; fi
   if [[ $found != "$expected" ]]; then
-    echo "ERROR: transporte en claro en $what: esperado=$expected, encontrado=$found" >&2
+    echo "ERROR: plaintext transport in $what: expected=$expected, found=$found" >&2
     exit 1
   fi
-  echo "    $what: transporte en claro presente=$found"
+  echo "    $what: plaintext transport present=$found"
 }
 
-echo "==> Transporte en claro: solo en el build Debug de LevelDeckKit"
+echo "==> Plaintext transport: only in LevelDeckKit's Debug build"
 check_insecure_transport "LevelDeckKit (Debug, swift test)" "$KIT_BUILD" yes
 check_insecure_transport "LevelDeckAgent.app (Release)" "$PRODUCTS/Release/LevelDeckAgent.app" no
 check_insecure_transport "LevelDeck.app (Release)" "$PRODUCTS/Release-iphonesimulator/LevelDeck.app" no
 
-echo "==> Localización: textos de las apps traducidos al español"
+echo "==> Localization: app strings translated to Spanish"
 python3 scripts/check-localizations.py
 
-echo "==> Todo OK"
+echo "==> All OK"
