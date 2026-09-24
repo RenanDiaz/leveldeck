@@ -3,7 +3,7 @@ import Testing
 @testable import LevelDeckKit
 
 enum Fixtures {
-    /// El ejemplo de `state` de SPEC §8 con IDs concretos.
+    /// The `state` example from SPEC §8 with concrete IDs.
     static let stateJSON = Data("""
     {
       "type": "state",
@@ -34,13 +34,13 @@ enum Fixtures {
         )
     )
 
-    /// Audífonos USB: volumen sin mute, para probar flags independientes.
+    /// USB headphones: volume without mute, to test independent flags.
     static let headphones = ChannelState(
         deviceId: "AppleUSBAudioEngine:Headset", deviceName: "USB Headset",
         volume: 0.3, muted: false, volumeSettable: true, muteSettable: false
     )
 
-    /// Decodifica el JSON a un diccionario para inspeccionar la forma del mensaje en el cable.
+    /// Decodes the JSON into a dictionary to inspect the message's shape on the wire.
     static func object(_ data: Data) throws -> [String: Any] {
         try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
     }

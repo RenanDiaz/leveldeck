@@ -3,13 +3,13 @@ import Foundation
 import Testing
 @testable import LevelDeckKit
 
-/// Ciclo completo sobre la red real en loopback (SPEC §11): servidor y cliente de
-/// LevelDeckKit, `hello` → `state`, `setVolume` → `state`, errores, selección de dispositivo
-/// y varios clientes.
+/// Full cycle over the real network on loopback (SPEC §11): LevelDeckKit server and
+/// client, `hello` → `state`, `setVolume` → `state`, errors, device selection
+/// and multiple clients.
 ///
-/// Usa TLS-PSK con claves fijas de prueba (Fase 3). Sin Bonjour: el cliente conecta directo
-/// al puerto dinámico del listener. El servidor no tiene `authorizer`: acepta cualquier `hello`
-/// que haya pasado el handshake; el emparejamiento se prueba en `PairingIntegrationTests`.
+/// Uses TLS-PSK with fixed test keys (Phase 3). No Bonjour: the client connects directly
+/// to the listener's dynamic port. The server has no `authorizer`: it accepts any `hello`
+/// that passed the handshake; pairing is tested in `PairingIntegrationTests`.
 @MainActor
 @Suite("Integración en loopback", .serialized)
 struct LoopbackIntegrationTests {
@@ -17,7 +17,7 @@ struct LoopbackIntegrationTests {
     let server: LevelDeckServer
 
     init() async throws {
-        // El cliente conecta a 127.0.0.1; el listener no se restringe a la interfaz de loopback.
+        // The client connects to 127.0.0.1; the listener isn't restricted to the loopback interface.
         server = LevelDeckServer(security: .tlsPSK(TestKeys.serverSet), advertise: false)
         server.delegate = agent
         server.start()
@@ -63,7 +63,7 @@ struct LoopbackIntegrationTests {
         #expect(state.input?.muted == true)
     }
 
-    /// Una ráfaga de comandos se agrupa (máx. 30/s), pero el último valor siempre llega.
+    /// A burst of commands is coalesced (max. 30/s), but the last value always arrives.
     @Test func burstEndsOnFinalValue() async throws {
         defer { server.stop() }
         let (client, messages) = try await connect()
@@ -83,8 +83,8 @@ struct LoopbackIntegrationTests {
         #expect(received < 20, "Los state se agrupan en vez de salir uno por comando")
     }
 
-    /// Dos clientes con claves distintas, conectados a la vez: el servidor elige la PSK por
-    /// la identidad de cada handshake.
+    /// Two clients with different keys, connected at the same time: the server picks the PSK by
+    /// each handshake's identity.
     @Test func everyClientReceivesChanges() async throws {
         defer { server.stop() }
         let (phone, phoneMessages) = try await connect(name: "iPhone")
@@ -135,10 +135,10 @@ struct LoopbackIntegrationTests {
         #expect(client.lastError?.code == .deviceNotFound)
     }
 
-    // MARK: - Fase 4: dispositivos y varios clientes
+    // MARK: - Phase 4: devices and multiple clients
 
-    /// Se conectan unos audífonos en la Mac: los dos clientes ven la lista nueva. Uno los
-    /// elige y ambos reciben el canal nuevo, con sus flags de configurabilidad.
+    /// Headphones get plugged into the Mac: both clients see the new list. One
+    /// selects them and both receive the new channel, with its settability flags.
     @Test func deviceListAndSelectionReachEveryClient() async throws {
         defer { server.stop() }
         let (phone, phoneMessages) = try await connect(name: "iPhone")
@@ -168,7 +168,7 @@ struct LoopbackIntegrationTests {
         }
     }
 
-    /// Se desconecta el dispositivo activo y macOS elige otro: los clientes reflejan ese.
+    /// The active device is unplugged and macOS picks another: clients reflect that one.
     @Test func activeDeviceDisappearingReachesEveryClient() async throws {
         agent.plug(Fixtures.headphones, scope: .output)
         agent.snapshot.output = Fixtures.headphones
@@ -191,8 +191,8 @@ struct LoopbackIntegrationTests {
         }
     }
 
-    /// Un dispositivo que desapareció entre la lista y el toque: solo quien lo pidió recibe
-    /// `deviceNotFound`, sigue conectado y nadie cambia de dispositivo.
+    /// A device that disappeared between the list and the tap: only the one who asked gets
+    /// `deviceNotFound`, stays connected, and nobody switches devices.
     @Test func selectingAMissingDeviceOnlyErrorsTheSender() async throws {
         defer { server.stop() }
         let (phone, phoneMessages) = try await connect(name: "iPhone")
@@ -208,7 +208,7 @@ struct LoopbackIntegrationTests {
         try await phoneMessages.nextError(.deviceNotFound)
         #expect(phone.status == .connected, "El error no cierra la conexión")
 
-        // La sesión sigue usable, y el otro cliente no vio ningún error ni cambio de dispositivo.
+        // The session is still usable, and the other client saw no error or device change.
         phone.send(.setVolume(scope: .output, value: 0.4))
         var padState = try await padMessages.nextState()
         while padState.output?.volume != 0.4 {
@@ -220,9 +220,9 @@ struct LoopbackIntegrationTests {
         _ = try await phoneMessages.nextState { $0.output?.volume == 0.4 }
     }
 
-    /// El iPad arrastra el fader de salida mientras el iPhone cambia volumen y mute: el fader
-    /// del iPad no se mueve, pero el mute sí se actualiza (SPEC §6.2). Si el iPhone cambia
-    /// de dispositivo, manda el agente y el arrastre del iPad queda invalidado.
+    /// The iPad drags the output fader while the iPhone changes volume and mute: the iPad's
+    /// fader doesn't move, but mute does update (SPEC §6.2). If the iPhone switches
+    /// devices, the agent wins and the iPad's drag is invalidated.
     @Test func draggingClientIsNotMovedByOtherClients() async throws {
         agent.plug(Fixtures.headphones, scope: .output)
         defer { server.stop() }

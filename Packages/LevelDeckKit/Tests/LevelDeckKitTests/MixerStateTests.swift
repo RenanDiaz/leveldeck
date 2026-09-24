@@ -49,7 +49,7 @@ struct MixerStateTests {
         mixer.apply(snapshot(output: 0.5), now: at(0))
         mixer.beginDrag(.output)
         mixer.drag(.output, to: 0.7)
-        // Eco retrasado de un valor anterior del arrastre.
+        // Delayed echo of an earlier drag value.
         mixer.apply(snapshot(output: 0.6), now: at(10))
         #expect(mixer[.output]?.volume == 0.7)
     }
@@ -119,8 +119,8 @@ struct MixerStateTests {
         #expect(mixer[.output]?.volume == 0.2)
     }
 
-    /// Otro cliente cambia el dispositivo mientras este arrastra: el arrastre deja de valer
-    /// hasta el próximo toque, para no pisar el volumen del dispositivo nuevo.
+    /// Another client changes the device while this one is dragging: the drag stops counting
+    /// until the next touch, so it doesn't overwrite the new device's volume.
     @Test func deviceChangeDuringDragInvalidatesTheDrag() {
         var mixer = MixerState()
         mixer.apply(snapshot(output: 0.5), now: at(0))
@@ -139,7 +139,7 @@ struct MixerStateTests {
         #expect(mixer.endDrag(.output, at: 1, now: at(20)) == nil)
         #expect(mixer[.output]?.volume == 0.2)
 
-        // Un `state` posterior se aplica directo: no queda retención.
+        // A later `state` is applied directly: no hold remains.
         var later = next
         later.output?.volume = 0.3
         mixer.apply(later, now: at(30))
@@ -234,7 +234,7 @@ struct RoundTripMeterTests {
         #expect(meter.didReceive(volume: 0.5, scope: .output, at: t0 + .milliseconds(12))
             == .milliseconds(12))
         #expect(meter.last == .milliseconds(12))
-        // Ya se consumió: un `state` repetido no cuenta dos veces.
+        // Already consumed: a repeated `state` doesn't count twice.
         #expect(meter.didReceive(volume: 0.5, scope: .output, at: t0 + .milliseconds(40)) == nil)
     }
 

@@ -3,10 +3,10 @@ import Foundation
 import Testing
 @testable import LevelDeckKit
 
-// Apoyo para los tests de integración en loopback (SPEC §11): agente en memoria, cola de
-// mensajes con espera acotada y conexión de un cliente al puerto dinámico del servidor.
+// Support for the loopback integration tests (SPEC §11): in-memory agent, message queue
+// with bounded waits, and connecting a client to the server's dynamic port.
 
-/// Claves fijas de prueba para el transporte TLS-PSK.
+/// Fixed test keys for the TLS-PSK transport.
 enum TestKeys {
     static let phone = (identity: "phone-test-identity", key: key(1))
     static let pad = (identity: "pad-test-identity", key: key(2))
@@ -15,7 +15,7 @@ enum TestKeys {
         PresharedKey(Data(repeating: byte, count: PresharedKey.byteCount))!
     }
 
-    /// Conjunto del servidor con los dos dispositivos de prueba.
+    /// Server set with the two test devices.
     static var serverSet: PresharedKeySet {
         PresharedKeySet([phone.identity: phone.key, pad.identity: pad.key])
     }
@@ -25,7 +25,7 @@ enum TestKeys {
     }
 }
 
-/// Espera el puerto del servidor y conecta un cliente a 127.0.0.1.
+/// Waits for the server's port and connects a client to 127.0.0.1.
 @MainActor
 func connect(
     to server: LevelDeckServer, security: TransportSecurity, name: String = "Test",
@@ -49,7 +49,7 @@ func connect(
     return (client, recorder)
 }
 
-/// `true` cuando la conexión ya no va a llegar a `connected`: falló o quedó esperando la red.
+/// `true` when the connection will no longer reach `connected`: it failed or is waiting for the network.
 @MainActor
 func isRejected(_ client: LevelDeckClient) -> Bool {
     switch client.status {
@@ -60,10 +60,10 @@ func isRejected(_ client: LevelDeckClient) -> Bool {
     }
 }
 
-/// Agente en memoria: aplica los comandos sobre el snapshot de los fixtures.
+/// In-memory agent: applies commands to the fixtures' snapshot.
 ///
-/// `catalog` tiene el estado de cada dispositivo que se puede elegir con `setDefaultDevice`;
-/// solo se puede elegir uno que además esté en `snapshot.devices` (conectado).
+/// `catalog` holds the state of every device that can be selected with `setDefaultDevice`;
+/// only one that is also in `snapshot.devices` (connected) can be selected.
 @MainActor
 final class FakeAgent: LevelDeckServerDelegate {
     var snapshot = Fixtures.snapshot
@@ -72,7 +72,7 @@ final class FakeAgent: LevelDeckServerDelegate {
     ]
     private(set) var commands: [ClientMessage] = []
 
-    /// Conecta un dispositivo, como lo vería el agente al enchufarlo.
+    /// Connects a device, as the agent would see it when plugged in.
     func plug(_ channel: ChannelState, scope: Scope) {
         catalog[channel.deviceId] = channel
         snapshot.devices[scope].append(DeviceInfo(id: channel.deviceId, name: channel.deviceName))
@@ -107,11 +107,11 @@ struct TimeoutError: Error, CustomStringConvertible {
     let description: String
 }
 
-/// Cola de mensajes recibidos con espera acotada.
+/// Queue of received messages with bounded waits.
 @MainActor
 final class MessageRecorder {
     private var buffer: [AgentMessage] = []
-    /// Estado de cliente y servidor para el mensaje de timeout.
+    /// Client and server state for the timeout message.
     var describeContext: (@MainActor () -> String)?
     private var waiter: (id: UUID, continuation: CheckedContinuation<AgentMessage, any Error>)?
 
@@ -156,7 +156,7 @@ final class MessageRecorder {
         return snapshot
     }
 
-    /// Descarta `state` hasta el primero que cumple la condición. Un `error` en el camino falla.
+    /// Discards `state` until the first one that meets the condition. An `error` along the way fails.
     func nextState(where condition: (StateSnapshot) -> Bool) async throws -> StateSnapshot {
         while true {
             let state = try await nextState()
@@ -164,7 +164,7 @@ final class MessageRecorder {
         }
     }
 
-    /// El siguiente mensaje debe ser un `error` con ese código.
+    /// The next message must be an `error` with that code.
     func nextError(_ code: ErrorCode) async throws {
         let message = try await next()
         guard case let .error(received, _) = message else {

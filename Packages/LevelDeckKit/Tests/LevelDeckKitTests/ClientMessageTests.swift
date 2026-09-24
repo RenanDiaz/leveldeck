@@ -54,7 +54,7 @@ struct ClientMessageTests {
     }
 
     @Test func decodesHelloWithoutDeviceId() throws {
-        // Un `hello` de la Fase 2 (sin deviceId) sigue siendo válido; el authorizer decide.
+        // A Phase 2 `hello` (without deviceId) is still valid; the authorizer decides.
         let json = Data(#"{"type":"hello","v":2,"deviceName":"iPhone"}"#.utf8)
         #expect(try ProtocolCoder.decode(ClientMessage.self, from: json) == .hello(deviceName: "iPhone", version: 2, deviceId: nil))
     }
@@ -74,7 +74,7 @@ struct ClientMessageTests {
     }
 
     @Test func decodesHelloWithOtherVersion() throws {
-        // La decodificación no valida la versión: eso le toca al agente, que responde `unsupportedVersion`.
+        // Decoding doesn't validate the version: that's the agent's job, which replies `unsupportedVersion`.
         let json = Data(#"{"type":"hello","v":1,"deviceName":"iPhone"}"#.utf8)
         #expect(try ProtocolCoder.decode(ClientMessage.self, from: json) == .hello(deviceName: "iPhone", version: 1))
     }

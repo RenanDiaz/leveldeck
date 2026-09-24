@@ -4,8 +4,8 @@ import Foundation
 import Testing
 @testable import LevelDeckKit
 
-/// El transporte en claro sigue existiendo solo en builds Debug de `LevelDeckKit`, para
-/// inspeccionar el protocolo (SPEC §5.3). Las apps ya no lo usan.
+/// The plaintext transport still exists only in Debug builds of `LevelDeckKit`, to
+/// inspect the protocol (SPEC §5.3). The apps no longer use it.
 @MainActor
 @Suite("Transporte en claro (solo Debug)", .serialized)
 struct PlaintextSmokeTests {

@@ -3,9 +3,9 @@ import Foundation
 import Testing
 @testable import LevelDeckKit
 
-/// Criterios de la Fase 3 (SPEC §9) sobre la red real en loopback: un dispositivo emparejado
-/// conecta, una clave desconocida se rechaza en el handshake y uno revocado pierde la
-/// conexión activa. El servidor lleva `PairingManager` con un `store` en memoria.
+/// Phase 3 criteria (SPEC §9) over the real network on loopback: a paired device
+/// connects, an unknown key is rejected in the handshake, and a revoked one loses its
+/// active connection. The server runs `PairingManager` with an in-memory `store`.
 @MainActor
 @Suite("TLS-PSK y emparejamiento en loopback", .serialized)
 struct PairingIntegrationTests {
@@ -117,13 +117,13 @@ struct PairingIntegrationTests {
         #expect(pairing.devices.map(\.id) == [phoneCode.deviceID])
         #expect(try store.loadDevices().map(\.device.id) == [phoneCode.deviceID])
 
-        // El iPhone sigue conectado y recibiendo cambios aunque el listener se reinició.
+        // The iPhone stays connected and keeps receiving changes even though the listener restarted.
         #expect(phone.status == .connected)
         agent.snapshot.output?.volume = 0.33
         server.stateDidChange()
         #expect(try await phoneMessages.nextState().output?.volume == 0.33)
 
-        // El iPad ya no puede volver: su clave salió del listener.
+        // The iPad can't come back: its key was removed from the listener.
         let (padAgain, padAgainMessages) = try await connect(with: padCode, name: "iPad")
         defer { padAgain.disconnect() }
         try await waitUntil("el handshake del revocado falla") { isRejected(padAgain) }
@@ -151,7 +151,7 @@ struct PairingIntegrationTests {
         defer { client.disconnect() }
         _ = try await messages.nextState()
 
-        // Empezar un emparejamiento reinicia el listener con la clave pendiente.
+        // Starting a pairing restarts the listener with the pending key.
         pairing.beginPairing(agentName: "Mac")
         let server = server
         try await waitUntil("el listener vuelve a estar listo") { server.port != nil }
@@ -163,7 +163,7 @@ struct PairingIntegrationTests {
 
     // MARK: - Helpers
 
-    /// Empareja un dispositivo de punta a punta y lo desconecta. Devuelve su código.
+    /// Pairs a device end to end and disconnects it. Returns its code.
     private func pair(name: String) async throws -> PairingCode {
         let code = pairing.beginPairing(agentName: "Mac")
         let (client, messages) = try await connect(with: code, name: name)
@@ -182,7 +182,7 @@ struct PairingIntegrationTests {
     }
 }
 
-/// El QR vence solo: su clave sale del listener y el código deja de servir.
+/// The QR expires on its own: its key leaves the listener and the code stops working.
 @MainActor
 @Suite("Vencimiento del QR", .serialized)
 struct PairingExpiryTests {

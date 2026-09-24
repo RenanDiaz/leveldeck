@@ -64,8 +64,8 @@ struct SendThrottleTests {
         #expect(throttle.submit(0.5, now: at(100)) == .wait)
     }
 
-    /// Un arrastre de 1 s con eventos cada 5 ms: nunca más de 30 envíos por segundo y el
-    /// último envío es el valor final.
+    /// A 1 s drag with events every 5 ms: never more than 30 sends per second, and the
+    /// last send is the final value.
     @Test func dragNeverExceedsThirtyPerSecondAndEndsOnFinalValue() {
         var throttle = SendThrottle<Float>()
         var sent: [(value: Float, at: ContinuousClock.Instant)] = []

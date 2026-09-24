@@ -50,7 +50,7 @@ struct AgentMessageTests {
         #expect(output["settable"] == nil)
     }
 
-    /// Los flags son independientes: mute sin volumen y volumen sin mute viajan tal cual.
+    /// Flags are independent: mute without volume and volume without mute travel as-is.
     @Test("Flags de configurabilidad independientes", arguments: [(true, false), (false, true), (false, false)])
     func independentSettableFlagsSurviveRoundTrip(volume: Bool, mute: Bool) throws {
         var snapshot = Fixtures.snapshot
@@ -96,7 +96,7 @@ struct AgentMessageTests {
         }
     }
 
-    /// La clave de la v1 (`settable`) ya no vale: sin `volumeSettable` no se decodifica.
+    /// The v1 key (`settable`) is no longer valid: without `volumeSettable` it doesn't decode.
     @Test func rejectsChannelWithLegacySettableKey() {
         let json = Data("""
         {"type":"state","v":1,"input":null,"devices":{"output":[],"input":[]},
