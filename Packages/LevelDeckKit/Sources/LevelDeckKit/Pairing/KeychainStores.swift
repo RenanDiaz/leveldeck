@@ -23,22 +23,43 @@ final class KeychainRecords<Record: Codable> {
         self.service = service
     }
 
+    /// En dos pasos: el llavero de login de macOS no admite `kSecReturnData` con
+    /// `kSecMatchLimitAll` (devuelve `errSecParam`), así que primero se listan las cuentas
+    /// y después se lee cada una.
     func loadAll() throws -> [Record] {
-        var query = baseQuery()
-        query[kSecMatchLimit as String] = kSecMatchLimitAll
-        query[kSecReturnData as String] = true
-        var result: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        if status == errSecItemNotFound { return [] }
-        try check(status, "SecItemCopyMatching")
-        let items = (result as? [Data]) ?? (result as? Data).map { [$0] } ?? []
-        return try items.map { data in
+        try accounts().compactMap { account -> Record? in
+            guard let data = try readData(account: account) else { return nil }
             do {
                 return try JSONDecoder().decode(Record.self, from: data)
             } catch {
                 throw PairingStoreError(.corrupted, detail: "\(service): \(error)")
             }
         }
+    }
+
+    private func accounts() throws -> [String] {
+        var query = baseQuery()
+        query[kSecMatchLimit as String] = kSecMatchLimitAll
+        query[kSecReturnAttributes as String] = true
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound { return [] }
+        try check(status, "SecItemCopyMatching")
+        let items = (result as? [[String: Any]]) ?? (result as? [String: Any]).map { [$0] } ?? []
+        return items.compactMap { $0[kSecAttrAccount as String] as? String }
+    }
+
+    /// `nil` si el ítem desapareció entre el listado y la lectura.
+    private func readData(account: String) throws -> Data? {
+        var query = baseQuery()
+        query[kSecAttrAccount as String] = account
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        query[kSecReturnData as String] = true
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound { return nil }
+        try check(status, "SecItemCopyMatching")
+        return result as? Data
     }
 
     func save(_ record: Record, account: String) throws {
@@ -96,7 +117,7 @@ final class KeychainRecords<Record: Codable> {
 public final class KeychainPairedDeviceStore: PairedDeviceStore {
     private let devices: KeychainRecords<PairedDeviceRecord>
     private let identity: KeychainRecords<String>
-    private static let identityAccount = "agentId"
+    static let identityAccount = "agentId"
 
     /// - Parameter service: prefijo de los servicios del Keychain; por defecto el bundle ID del agente.
     public init(service: String = "com.renandiaz.LevelDeckAgent") {
