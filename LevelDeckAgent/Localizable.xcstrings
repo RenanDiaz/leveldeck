@@ -71,6 +71,16 @@
         }
       }
     },
+    "Couldn't change the login item.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo cambiar el ítem de inicio."
+          }
+        }
+      }
+    },
     "Couldn't generate the QR code.": {
       "localizations": {
         "es": {
@@ -187,6 +197,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Abre LevelDeck en el iPhone, toca Emparejar y apunta la cámara a este código. La clave nunca sale de esta pantalla."
+          }
+        }
+      }
+    },
+    "Open Login Items Settings…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir ajustes de ítems de inicio…"
+          }
+        }
+      }
+    },
+    "Open at Login": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir al iniciar sesión"
           }
         }
       }
@@ -397,6 +427,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Esperando la red…"
+          }
+        }
+      }
+    },
+    "macOS needs your approval to open LevelDeck Agent at login.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS necesita tu aprobación para abrir LevelDeck Agent al iniciar sesión."
           }
         }
       }

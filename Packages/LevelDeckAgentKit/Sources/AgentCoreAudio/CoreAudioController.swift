@@ -10,7 +10,9 @@ import LevelDeckKit
 /// en el main actor. Al cambiar el dispositivo por defecto de un scope, los listeners de
 /// ese scope se mueven al dispositivo nuevo. Un cambio en la lista de dispositivos (conectar
 /// o desconectar algo) se avisa para ambos scopes; si desaparece el activo, el dispositivo
-/// que elija macOS llega por el listener del default.
+/// que elija macOS llega por el listener del default. Si `coreaudiod` se reinicia, todos
+/// los listeners quedan inválidos: `kAudioHardwarePropertyServiceRestarted` los vuelve a
+/// suscribir y avisa ambos scopes.
 @MainActor
 public final class CoreAudioController: AudioControlling {
     private struct Listener {
@@ -94,6 +96,9 @@ public final class CoreAudioController: AudioControlling {
     public func startObserving(_ onChange: @escaping @MainActor (Scope) -> Void) {
         stopObserving()
         self.onChange = onChange
+        if let listener = addServiceRestartedListener() {
+            systemListeners.append(listener)
+        }
         // La lista de dispositivos es del sistema y afecta a ambos scopes.
         if let listener = addListener(
             HAL.systemObject, HAL.address(kAudioHardwarePropertyDevices),
@@ -131,6 +136,31 @@ public final class CoreAudioController: AudioControlling {
             }
             onChange?(scope)
         }
+    }
+
+    /// `coreaudiod` se reinició: los listeners viejos ya no existen del lado de la HAL.
+    private func serviceRestarted(listener: UInt64) {
+        guard let onChange, activeListeners.contains(listener) else { return }
+        startObserving(onChange)
+        for scope in Scope.allCases {
+            onChange(scope)
+        }
+    }
+
+    private func addServiceRestartedListener() -> Listener? {
+        nextListenerID += 1
+        let id = nextListenerID
+        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            MainActor.assumeIsolated {
+                self?.serviceRestarted(listener: id)
+            }
+        }
+        var address = HAL.address(kAudioHardwarePropertyServiceRestarted)
+        guard AudioObjectAddPropertyListenerBlock(HAL.systemObject, &address, DispatchQueue.main, block) == noErr else {
+            return nil
+        }
+        activeListeners.insert(id)
+        return Listener(id: id, object: HAL.systemObject, address: address, block: block)
     }
 
     /// Escucha volumen y mute del dispositivo por defecto actual del scope.

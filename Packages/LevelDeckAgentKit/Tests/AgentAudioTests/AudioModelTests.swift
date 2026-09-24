@@ -33,6 +33,31 @@ struct AudioModelTests {
         #expect(!mock.isObserving)
     }
 
+    // MARK: - Despertar (Fase 5)
+
+    /// Mientras la Mac dormía cambió el dispositivo sin que llegara ningún aviso: al despertar,
+    /// `restart` vuelve a suscribir los listeners y relee ambos scopes.
+    @Test func restartResubscribesAndRereadsBothScopes() {
+        var changes = 0
+        model.onChange = { changes += 1 }
+        mock.system[.output] = .hdmi
+
+        model.restart()
+        #expect(model.channel(.output) == .hdmi)
+        #expect(model.channel(.input) == .microphone)
+        #expect(mock.stopCount == 1)
+        #expect(mock.startCount == 2)
+        #expect(mock.isObserving)
+        #expect(changes >= 1, "El servidor se entera y manda state")
+    }
+
+    @Test func restartWhenStoppedStarts() {
+        model.stop()
+        model.restart()
+        #expect(mock.startCount == 2)
+        #expect(mock.isObserving)
+    }
+
     @Test func missingInputDeviceIsNil() {
         let mock = MockAudioController(system: [.output: .speakers])
         let model = AudioModel(controller: mock)

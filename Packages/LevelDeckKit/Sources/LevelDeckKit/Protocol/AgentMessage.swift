@@ -1,21 +1,35 @@
+import Foundation
+
 /// Mensajes Agente → Cliente (SPEC §8).
 public enum AgentMessage: Sendable, Equatable {
+    /// Primer mensaje de cada sesión: el cliente responde con un `hello` cuya `proof` firma
+    /// este `nonce` (SPEC §8). El cliente lo consume y no lo publica.
+    case challenge(nonce: Data)
     case state(StateSnapshot, version: Int = ProtocolVersion.current)
     case error(code: ErrorCode, message: String)
 }
 
 extension AgentMessage: Codable {
     private enum MessageType: String, Codable {
-        case state, error
+        case challenge, state, error
     }
 
     private enum CodingKeys: String, CodingKey {
-        case type, v, output, input, devices, code, message
+        case type, v, output, input, devices, code, message, nonce
     }
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         switch try container.decode(MessageType.self, forKey: .type) {
+        case .challenge:
+            let text = try container.decode(String.self, forKey: .nonce)
+            guard let nonce = Data(base64URLEncoded: text), nonce.count == HelloProof.nonceByteCount else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .nonce, in: container,
+                    debugDescription: "El nonce debe ser base64url de \(HelloProof.nonceByteCount) bytes."
+                )
+            }
+            self = .challenge(nonce: nonce)
         case .state:
             // `null` = sin dispositivo; la clave ausente sigue siendo un error de decodificación.
             let snapshot = StateSnapshot(
@@ -35,6 +49,9 @@ extension AgentMessage: Codable {
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         switch self {
+        case let .challenge(nonce):
+            try container.encode(MessageType.challenge, forKey: .type)
+            try container.encode(nonce.base64URLEncodedString(), forKey: .nonce)
         case let .state(snapshot, version):
             // Payload plano: los campos del snapshot van al mismo nivel que `type`.
             try container.encode(MessageType.state, forKey: .type)

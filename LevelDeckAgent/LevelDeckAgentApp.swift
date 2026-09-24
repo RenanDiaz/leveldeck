@@ -7,6 +7,9 @@ import SwiftUI
 struct LevelDeckAgentApp: App {
     @State private var audio: AudioModel
     @State private var remote: RemoteService
+    @State private var loginItem: LoginItem
+    /// Se guarda para que viva lo que vive la app.
+    private let systemEvents: SystemEvents
 
     init() {
         let audio = AudioModel(controller: CoreAudioController())
@@ -16,11 +19,28 @@ struct LevelDeckAgentApp: App {
         let remote = RemoteService(audio: audio, store: KeychainPairedDeviceStore())
         remote.start()
         _remote = State(initialValue: remote)
+
+        // Al despertar o cambiar de red: volver a anunciarse y, al despertar, re-suscribir
+        // los listeners de CoreAudio (SPEC §5.2, §5.3).
+        systemEvents = SystemEvents(
+            onWake: {
+                remote.server.restartListener()
+                audio.restart()
+            },
+            onNetworkChange: {
+                remote.server.restartListener()
+            }
+        )
+        systemEvents.start()
+
+        let loginItem = LoginItem()
+        loginItem.registerOnFirstLaunch()
+        _loginItem = State(initialValue: loginItem)
     }
 
     var body: some Scene {
         MenuBarExtra {
-            MenuContent(audio: audio, remote: remote)
+            MenuContent(audio: audio, remote: remote, loginItem: loginItem)
         } label: {
             // Template image: macOS lo tiñe según el modo claro/oscuro de la barra.
             Image("MenuBarIcon")
@@ -39,6 +59,7 @@ struct LevelDeckAgentApp: App {
 private struct MenuContent: View {
     let audio: AudioModel
     let remote: RemoteService
+    let loginItem: LoginItem
 
     @Environment(\.openWindow) private var openWindow
 
@@ -55,6 +76,8 @@ private struct MenuContent: View {
                 openWindow(id: PairingWindowView.windowID)
                 NSApplication.shared.activate()
             }
+            Divider()
+            LoginItemView(loginItem: loginItem)
             Divider()
             HStack {
                 Text("Protocol v\(ProtocolVersion.current)")

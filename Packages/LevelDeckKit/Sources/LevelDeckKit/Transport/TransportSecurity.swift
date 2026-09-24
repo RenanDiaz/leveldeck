@@ -91,6 +91,13 @@ extension NWParameters {
         let tcp = NWProtocolTCP.Options()
         // Mensajes chicos e interactivos: sin Nagle, cada frame sale en cuanto se envía.
         tcp.noDelay = true
+        // Keepalive: si el otro lado desaparece sin cerrar (la Mac se durmió, se apagó el
+        // Wi-Fi), la conexión se da por muerta en ~11 s en vez de minutos. Sin esto, el
+        // iPhone no empieza a reconectar y la Mac lista clientes fantasma (SPEC §5.3).
+        tcp.enableKeepalive = true
+        tcp.keepaliveIdle = 5
+        tcp.keepaliveInterval = 2
+        tcp.keepaliveCount = 3
         let parameters = NWParameters(tls: tls, tcp: tcp)
         let webSocket = NWProtocolWebSocket.Options()
         webSocket.autoReplyPing = true

@@ -1,8 +1,11 @@
+import Foundation
+
 /// Mensajes Cliente → Agente (SPEC §8).
 public enum ClientMessage: Sendable, Equatable {
-    /// `deviceId` es la identidad PSK que la Mac asignó al emparejar (SPEC §7). Va siempre
-    /// con TLS-PSK; solo falta en el transporte en claro de desarrollo.
-    case hello(deviceName: String, version: Int = ProtocolVersion.current, deviceId: String? = nil)
+    /// `deviceId` es la identidad PSK que la Mac asignó al emparejar (SPEC §7) y `proof` el
+    /// HMAC del `nonce` del `challenge` con la clave de ese `deviceId` (`HelloProof`, SPEC §8).
+    /// Ambos van siempre con TLS-PSK; solo faltan en el transporte en claro de desarrollo.
+    case hello(deviceName: String, version: Int = ProtocolVersion.current, deviceId: String? = nil, proof: Data? = nil)
     case setVolume(scope: Scope, value: Float)
     case setMute(scope: Scope, muted: Bool)
     case setDefaultDevice(scope: Scope, deviceId: String)
@@ -14,17 +17,27 @@ extension ClientMessage: Codable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case type, v, deviceName, scope, value, muted, deviceId
+        case type, v, deviceName, scope, value, muted, deviceId, proof
     }
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         switch try container.decode(MessageType.self, forKey: .type) {
         case .hello:
+            var proof: Data?
+            if let text = try container.decodeIfPresent(String.self, forKey: .proof) {
+                guard let data = Data(base64URLEncoded: text) else {
+                    throw DecodingError.dataCorruptedError(
+                        forKey: .proof, in: container, debugDescription: "La prueba debe ser base64url."
+                    )
+                }
+                proof = data
+            }
             self = .hello(
                 deviceName: try container.decode(String.self, forKey: .deviceName),
                 version: try container.decode(Int.self, forKey: .v),
-                deviceId: try container.decodeIfPresent(String.self, forKey: .deviceId)
+                deviceId: try container.decodeIfPresent(String.self, forKey: .deviceId),
+                proof: proof
             )
         case .setVolume:
             let value = try container.decode(Float.self, forKey: .value)
@@ -51,11 +64,12 @@ extension ClientMessage: Codable {
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         switch self {
-        case let .hello(deviceName, version, deviceId):
+        case let .hello(deviceName, version, deviceId, proof):
             try container.encode(MessageType.hello, forKey: .type)
             try container.encode(version, forKey: .v)
             try container.encode(deviceName, forKey: .deviceName)
             try container.encodeIfPresent(deviceId, forKey: .deviceId)
+            try container.encodeIfPresent(proof?.base64URLEncodedString(), forKey: .proof)
         case let .setVolume(scope, value):
             guard Volume.isValid(value) else {
                 throw EncodingError.invalidValue(

@@ -17,6 +17,7 @@ struct MixerView: View {
             #endif
         }
         .padding()
+        .sensoryFeedback(.impact(weight: .light), trigger: model.hapticTick)
         .navigationTitle(model.agentName)
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -36,6 +37,23 @@ private struct StatusBanner: View {
         case .idle, .connecting:
             Label("Connecting…", systemImage: "antenna.radiowaves.left.and.right")
                 .font(.footnote)
+        case let .reconnecting(_, issue):
+            // Los faders quedan deshabilitados; el cliente reintenta solo (SPEC §6.2).
+            VStack(spacing: 4) {
+                Label {
+                    Text("Reconnecting…")
+                } icon: {
+                    ProgressView().controlSize(.small)
+                }
+                if let issue {
+                    Text(issue.message)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    TechnicalDetail(issue: issue)
+                }
+            }
+            .font(.footnote)
         case let .waiting(issue):
             VStack(spacing: 4) {
                 Label("Waiting for the local network", systemImage: "wifi.exclamationmark")

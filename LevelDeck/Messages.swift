@@ -18,6 +18,8 @@ extension NetworkIssue {
             String(localized: "Couldn't find the Mac's address.")
         case .handshakeFailed:
             String(localized: "The Mac didn't recognize this iPhone's key. Pair it again from the Mac's menu.")
+        case .noResponse:
+            String(localized: "The Mac didn't respond. Make sure LevelDeck and LevelDeck Agent are up to date.")
         case .other:
             String(localized: "Couldn't connect to the Mac.")
         }

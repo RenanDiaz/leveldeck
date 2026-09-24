@@ -54,6 +54,23 @@ public final class AudioModel {
         }
     }
 
+    /// Vuelve a suscribir los listeners y relee ambos scopes. Se usa al despertar la Mac: los
+    /// dispositivos pueden haber cambiado mientras dormía (SPEC §5.2). Si no estaba corriendo,
+    /// arranca.
+    public func restart() {
+        guard isRunning else {
+            start()
+            return
+        }
+        controller.stopObserving()
+        for scope in Scope.allCases {
+            refresh(scope)
+        }
+        controller.startObserving { [weak self] scope in
+            self?.refresh(scope)
+        }
+    }
+
     public func stop() {
         guard isRunning else { return }
         isRunning = false
