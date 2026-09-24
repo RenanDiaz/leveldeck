@@ -1,7 +1,7 @@
 # SPEC — LevelDeck
 
 > Deriva de `INTENT.md`. Si algo aquí contradice el intent, manda el intent.
-> Estado: borrador v1.7 (Fase 5: reconexión, hápticos, login item y challenge-response del `hello`; incluye la lectura del Keychain de la Mac en dos pasos de la v1.6.1)
+> Estado: **Parte I (v1)** — v1.7, implementada hasta la Fase 5 (reconexión, hápticos, login item y challenge-response del `hello`; incluye la lectura del Keychain de la Mac en dos pasos de la v1.6.1). **Parte II (v2)** — borrador 2.0 en revisión (§13–§21): tiras por dispositivo, protocolo v4, app universal, auditoría de diseño y spike de volumen por app.
 
 ## 1. Resumen
 
@@ -16,10 +16,10 @@ Sin servidores externos, sin cuentas y sin dependencias de terceros.
 
 | Pregunta | Decisión para v1 | Estado |
 |---|---|---|
-| Volumen por aplicación | Fuera de v1. Se evalúa después (ver §10). | Provisional |
+| Volumen por aplicación | Fuera de v1. Spike con go/no-go en la v2 (§20). | Provisional |
 | Emparejamiento | Código QR mostrado en la Mac y escaneado desde el iPhone; la clave del QR es la PSK del handshake TLS (§7). | Decidido (Fase 3) |
 | Widget / Centro de Control | Fuera de v1 (ver §10). | Provisional |
-| Estilo de interfaz | Mixer con dos faders verticales (Salida, Entrada) y selector de dispositivo. | Provisional |
+| Estilo de interfaz | Mixer con dos faders verticales (Salida, Entrada) y selector de dispositivo. En la v2 pasa a una tira por dispositivo (§13). | Provisional |
 
 ## 3. Plataformas y requisitos
 
@@ -308,9 +308,9 @@ Cada fase termina con algo que se puede usar y probar.
 
 ## 10. Después de v1
 
-- **Volumen por aplicación.** Requiere un driver de audio virtual (tipo HAL plug-in / AudioServerPlugIn) que capture el audio de cada app. Alternativas: escribir uno propio (alto costo y firma más compleja), integrarse con BackgroundMusic (open source) o controlar SoundSource si expone automatización. Hacer un spike antes de decidir.
+- **Volumen por aplicación.** → v2, §20. La alternativa sin driver son los process taps de Core Audio (macOS 14.4+); la Fase 10 es un spike con go/no-go. Lo que decía aquí la v1 (driver virtual tipo AudioServerPlugIn, BackgroundMusic, SoundSource) queda como alternativa descartada en §20.2.
 - **Widget / Centro de Control (iOS 18+).** Los Control Widgets ejecutan App Intents de corta duración y no pueden mantener una conexión abierta. Cada acción tendría que conectar, hacer el handshake TLS, enviar y cerrar. Hay que medir si la latencia resultante es aceptable.
-- **Mac → Mac o iPad.** El cliente es SwiftUI, así que portarlo a iPad es casi gratis.
+- **Mac → Mac o iPad.** iPad → v2, Fase 8 (§17). Un cliente para Mac sigue fuera de alcance.
 - **Endurecer el emparejamiento.** (a) Derivar la clave definitiva del exporter de la primera sesión TLS para que el QR sea de un solo uso de verdad (§7.2). (b) Forward secrecy: probar `TLS_ECDHE_PSK_WITH_CHACHA20_POLY1305_SHA256` (0xCCAC) en Network.framework; si negocia, preferirlo. (c) Atar la prueba del `hello` a la sesión TLS: incluir en el HMAC un valor del exporter de esa conexión (`sec_protocol_metadata_create_secret`) además del `nonce`. Hoy la prueba no está atada al canal; un relay requeriría que el dispositivo víctima firme un `nonce` ajeno, y la víctima no puede completar un handshake con el atacante porque no comparten clave, así que no es explotable en nuestra amenaza. Ninguna de las tres cambia el flujo del usuario.
 - ~~**Verificar el `deviceId` del `hello`.**~~ Hecho en la Fase 5 con challenge-response (§5.3, §8).
 
