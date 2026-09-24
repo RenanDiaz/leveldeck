@@ -18,7 +18,7 @@ Swift and SwiftUI on both sides, system frameworks only. No servers, accounts, c
 
 ## Status
 
-v1 complete through phases 0–5 (see [`SPEC.md` §9](SPEC.md#9-phases)). Per-app volume and Control Center widgets are left for after v1 (§10).
+v1 complete through phases 0–5 (see [`SPEC.md` §9](SPEC.md#9-phases)). v2 is being planned: per-device strips, protocol v4, an iPad layout and a per-app volume spike, in [`SPEC.md` Part II](SPEC.md#part-ii--v2) (§13–§22, draft) and the v2 section of [`INTENT.md`](INTENT.md#v2--draft-for-approval). Control Center widgets stay for later (§10).
 
 ## Requirements
 
