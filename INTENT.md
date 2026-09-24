@@ -52,9 +52,9 @@ With Claude Code or another coding agent, starting from this document. The techn
 
 ---
 
-## v2 — draft for approval
+## v2 — approved
 
-> Status: **draft**. The agent wrote it from the goals I gave it; until I approve it, v1 (above) is the only intent in force. The v2 spec (`SPEC.md`, Part II) derives from this section.
+> Status: **approved** (2026-09-24). Written by the agent from the goals I gave it and approved with the decisions recorded in `SPEC.md` §21. From here on, this section and v1 (above) together are the intent in force; the v2 spec (`SPEC.md`, Part II) derives from this section.
 
 ### Why a v2
 
@@ -95,8 +95,8 @@ The v1 ones, unchanged: Apple-native, local first, invisible on the Mac, simple 
 - Widget and Control Center. Still on the "later" list.
 - A Mac client (controlling one Mac from another). The code would allow it, but I don't need it.
 
-### Open questions
+### Open questions, answered
 
-- What does the mixer look like on the iPhone with ten strips? Horizontal scrolling, two tabs (Output and Input) or a compact view with horizontal sliders?
-- Are strips in stable name order with the default highlighted, or is the default always first?
-- Per-app volume: do I accept the agent inserting itself into those apps' audio path (capture, attenuate and play back), with the system audio recording permission that requires?
+- **The mixer on the iPhone with ten strips:** horizontal scrolling, Output above and Input below. But the gesture (a vertical fader inside a horizontal scroll) gets validated on a real iPhone before the mixer is built; if it can't be made to feel right, it becomes two tabs, Output and Input.
+- **Strip order:** stable, by name, with the default highlighted. The fader I'm dragging never moves because something else changed: strips are identified by device, never by position, and a device plugged in mid-drag waits until I let go.
+- **Per-app volume:** I accept exploring it with a spike, on one condition beyond the measurements: an app at 100 % must have no tap at all. Its audio never goes through the agent and gains no latency; only the apps I actually turn down pay the cost, and only while they're turned down.
