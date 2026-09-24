@@ -1,7 +1,7 @@
 import LevelDeckKit
 
-// Textos localizados para lo que llega de LevelDeckKit o del agente. Nunca se muestra el
-// `localizedDescription` del sistema ni el `message` del agente: mezclan idiomas.
+// Localized text for whatever comes from LevelDeckKit or the agent. The system's
+// `localizedDescription` and the agent's `message` are never shown: they mix languages.
 
 extension NetworkIssue {
     var message: String {

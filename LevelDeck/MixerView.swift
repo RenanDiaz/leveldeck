@@ -1,7 +1,7 @@
 import LevelDeckKit
 import SwiftUI
 
-/// Mixer con dos faders verticales, Salida y Entrada, cada uno con mute (SPEC §6.1).
+/// Mixer with two vertical faders, Output and Input, each with mute (SPEC §6.1).
 struct MixerView: View {
     let model: MixerModel
 
@@ -38,7 +38,7 @@ private struct StatusBanner: View {
             Label("Connecting…", systemImage: "antenna.radiowaves.left.and.right")
                 .font(.footnote)
         case let .reconnecting(_, issue):
-            // Los faders quedan deshabilitados; el cliente reintenta solo (SPEC §6.2).
+            // The faders stay disabled; the client retries on its own (SPEC §6.2).
             VStack(spacing: 4) {
                 Label {
                     Text("Reconnecting…")
@@ -155,7 +155,7 @@ private struct ChannelStrip: View {
         }
     }
 
-    /// Cada control se deshabilita por separado; el texto dice cuál no se puede cambiar.
+    /// Each control is disabled separately; the text says which one can't be changed.
     private func settabilityNote(_ channel: ChannelState) -> String? {
         switch (channel.volumeSettable, channel.muteSettable) {
         case (true, true): nil
@@ -204,7 +204,7 @@ private struct ChannelStrip: View {
 }
 
 #if DEBUG
-/// Overlay de debug: RTT de `setVolume` → `state` para verificar la latencia (Fase 2).
+/// Debug overlay: `setVolume` → `state` RTT to check latency (Phase 2).
 private struct RoundTripOverlay: View {
     let meter: RoundTripMeter
 

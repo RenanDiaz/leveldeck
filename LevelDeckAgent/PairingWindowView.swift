@@ -2,8 +2,8 @@ import CoreImage.CIFilterBuiltins
 import LevelDeckKit
 import SwiftUI
 
-/// Ventana con el QR de emparejamiento (SPEC §7): expira a los 2 minutos, confirma cuando el
-/// iPhone se registra y, al cerrarse, descarta la clave pendiente.
+/// Window with the pairing QR code (SPEC §7): expires after 2 minutes, confirms when the
+/// iPhone registers and, when closed, discards the pending key.
 struct PairingWindowView: View {
     static let windowID = "pairing"
 
@@ -28,7 +28,7 @@ struct PairingWindowView: View {
         .padding(24)
         .frame(width: 360)
         .onDisappear {
-            // Cerrar la ventana sin emparejar descarta la clave pendiente.
+            // Closing the window without pairing discards the pending key.
             pairing.cancelPairing()
         }
     }
@@ -49,7 +49,7 @@ struct PairingWindowView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             #if DEBUG
-            // Sin cámara (simulador): el código se puede copiar y pegar en el iPhone.
+            // No camera (simulator): the code can be copied and pasted on the iPhone.
             Text(verbatim: pending.code.encoded())
                 .font(.caption2.monospaced())
                 .foregroundStyle(.tertiary)
@@ -84,7 +84,7 @@ struct PairingWindowView: View {
         }
     }
 
-    /// El iPhone pasó el handshake pero la Mac no pudo guardar la clave: no se empareja.
+    /// The iPhone passed the handshake but the Mac couldn't store the key: not paired.
     private func failed(_ error: PairingStoreError) -> some View {
         VStack(spacing: 12) {
             Image(systemName: "key.slash")
@@ -144,7 +144,7 @@ struct PairingWindowView: View {
     }
 }
 
-/// QR generado con CoreImage, sin interpolar para que los módulos queden nítidos.
+/// QR code generated with CoreImage, without interpolation so the modules stay sharp.
 private struct QRCodeView: View {
     let text: String
 

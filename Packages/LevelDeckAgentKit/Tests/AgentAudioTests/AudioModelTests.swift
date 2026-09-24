@@ -13,7 +13,7 @@ struct AudioModelTests {
         model.start()
     }
 
-    // MARK: - Arranque
+    // MARK: - Startup
 
     @Test func startLoadsBothScopes() {
         #expect(model.channel(.output) == .speakers)
@@ -33,10 +33,10 @@ struct AudioModelTests {
         #expect(!mock.isObserving)
     }
 
-    // MARK: - Despertar (Fase 5)
+    // MARK: - Wake (Phase 5)
 
-    /// Mientras la Mac dormía cambió el dispositivo sin que llegara ningún aviso: al despertar,
-    /// `restart` vuelve a suscribir los listeners y relee ambos scopes.
+    /// The device changed while the Mac was asleep and no notification arrived: on wake,
+    /// `restart` resubscribes the listeners and rereads both scopes.
     @Test func restartResubscribesAndRereadsBothScopes() {
         var changes = 0
         model.onChange = { changes += 1 }
@@ -73,7 +73,7 @@ struct AudioModelTests {
         #expect(model.lastError == .noDevice(.input))
     }
 
-    // MARK: - Acciones del menú
+    // MARK: - Menu actions
 
     @Test("setVolume llega al sistema con su scope", arguments: Scope.allCases)
     func setVolumeForwardsScope(scope: Scope) {
@@ -111,7 +111,7 @@ struct AudioModelTests {
         #expect(model.lastError == nil)
     }
 
-    // MARK: - Cambios externos
+    // MARK: - External changes
 
     @Test func externalVolumeChangeUpdatesModel() {
         mock.simulateExternalChange(.output) { $0[.output]?.volume = 0.3 }
@@ -149,7 +149,7 @@ struct AudioModelTests {
         #expect(model.channel(.output)?.volume == 0.62)
     }
 
-    // MARK: - Dispositivos no configurables
+    // MARK: - Non-settable devices
 
     @Test func volumeNotSettableDisablesSliderWithoutWriting() {
         mock.simulateExternalChange(.output) { $0[.output] = .hdmi }
@@ -176,7 +176,7 @@ struct AudioModelTests {
         #expect(model.lastError == .notSettable(.input))
     }
 
-    // MARK: - Errores de CoreAudio
+    // MARK: - CoreAudio errors
 
     @Test func readErrorKeepsLastState() {
         mock.readError = .coreAudio(status: -50)

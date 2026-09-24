@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Fader vertical. El arrastre es relativo (mueve desde el valor actual, no salta al dedo)
-/// y avisa inicio, cambios y fin para que el mixer maneje throttle y supresión de eco.
+/// Vertical fader. Dragging is relative (moves from the current value, doesn't jump to the finger)
+/// and reports start, changes and end so the mixer can handle throttle and echo suppression.
 struct VerticalFader: View {
     let value: Float
     var isEnabled = true
@@ -10,7 +10,7 @@ struct VerticalFader: View {
     let onChanged: (Float) -> Void
     let onEnded: (Float) -> Void
 
-    /// Valor al empezar el arrastre; `nil` si no hay uno en curso.
+    /// Value when the drag started; `nil` if none is in progress.
     @State private var dragStart: Float?
 
     var body: some View {
@@ -47,7 +47,7 @@ struct VerticalFader: View {
         .opacity(isEnabled ? 1 : 0.4)
         .allowsHitTesting(isEnabled)
         .onChange(of: isEnabled) {
-            // Si se deshabilita a mitad de un arrastre (p. ej. se cae la conexión), cerrarlo.
+            // If it gets disabled mid-drag (e.g. the connection drops), end the drag.
             if !isEnabled, dragStart != nil {
                 dragStart = nil
                 onEnded(value)

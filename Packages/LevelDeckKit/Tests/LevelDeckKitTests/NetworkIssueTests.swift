@@ -25,7 +25,7 @@ struct NetworkIssueTests {
     }
 
     @Test func tlsErrorsAreHandshakeFailures() {
-        // errSSLPeerHandshakeFail: el servidor abortó el handshake (clave o identidad desconocida).
+        // errSSLPeerHandshakeFail: the server aborted the handshake (unknown key or identity).
         #expect(NetworkIssue(NWError.tls(-9824)).kind == .handshakeFailed)
     }
 

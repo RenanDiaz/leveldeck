@@ -1,5 +1,5 @@
-/// Supresión de eco de un fader (SPEC §6.2): mientras se arrastra, y hasta `hold` después
-/// de soltarlo, el cliente es la fuente de verdad y los `state` entrantes no lo mueven.
+/// Echo suppression for a fader (SPEC §6.2): while dragging, and until `hold` after
+/// releasing it, the client is the source of truth and incoming `state` messages do not move it.
 public struct EchoGate: Sendable, Equatable {
     public let hold: Duration
     public private(set) var isInteracting = false
@@ -25,7 +25,7 @@ public struct EchoGate: Sendable, Equatable {
         return now < releasedAt + hold
     }
 
-    /// Cuándo deja de suprimir, si se soltó y no se volvió a tocar.
+    /// When it stops suppressing, if it was released and not touched again.
     public var releaseDeadline: ContinuousClock.Instant? {
         guard !isInteracting, let releasedAt else { return nil }
         return releasedAt + hold

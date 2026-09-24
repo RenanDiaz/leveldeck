@@ -38,7 +38,7 @@ struct AudioServerBridgeTests {
         #expect(bridge.currentState().input == nil)
     }
 
-    // MARK: - Comandos
+    // MARK: - Commands
 
     @Test("setVolume se aplica al sistema", arguments: Scope.allCases)
     func setVolumeApplies(scope: Scope) {
@@ -125,7 +125,7 @@ struct AudioServerBridgeTests {
         #expect(bridge.handle(.setVolume(scope: .output, value: 0.5)) == nil)
     }
 
-    // MARK: - Notificación de cambios
+    // MARK: - Change notification
 
     @Test func externalChangeNotifies() {
         let (mock, model, _) = makeBridge()

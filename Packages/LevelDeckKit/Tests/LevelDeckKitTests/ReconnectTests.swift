@@ -3,9 +3,9 @@ import Foundation
 import Testing
 @testable import LevelDeckKit
 
-/// Reconexión con backoff (Fase 5, SPEC §6.2) con un reloj manual: el test avanza el tiempo y
-/// comprueba que cada intento sale exactamente cuando vence su espera, sin dormir de verdad.
-/// Lo único que se espera en tiempo real es que el intento falle o conecte en loopback.
+/// Reconnection with backoff (Phase 5, SPEC §6.2) with a manual clock: the test advances time and
+/// checks that each attempt fires exactly when its wait expires, without actually sleeping.
+/// The only real-time wait is for the attempt to fail or connect on loopback.
 @MainActor
 @Suite("Reconexión con backoff", .serialized)
 struct ReconnectTests {
@@ -23,7 +23,7 @@ struct ReconnectTests {
             #expect(client.scheduledRetryDelay == .seconds(seconds), "Espera tras \(failures) fallos")
             #expect(client.attempts == failures)
 
-            // Un instante antes de vencer no sale ningún intento.
+            // An instant before expiry, no attempt fires.
             clock.advance(by: .seconds(seconds) - .milliseconds(1))
             await settle()
             #expect(client.attempts == failures, "Reintentó antes de tiempo tras \(failures) fallos")
@@ -42,7 +42,7 @@ struct ReconnectTests {
         try await waitForRetry(client, afterFailures: 2)
         #expect(client.scheduledRetryDelay == .seconds(2))
 
-        // Volver al frente: intento inmediato, sin avanzar el reloj.
+        // Back to the foreground: immediate attempt, without advancing the clock.
         client.reconnectNow()
         #expect(client.attempts == 3)
         #expect(client.scheduledRetryDelay == nil)
@@ -51,8 +51,8 @@ struct ReconnectTests {
         #expect(clock.sleeperCount == 1, "La espera anterior se canceló")
     }
 
-    /// El agente no está; aparece en su puerto y el cliente conecta solo en el siguiente
-    /// intento. Si después se va, el backoff arranca otra vez desde 1 s.
+    /// The agent isn't there; it shows up on its port and the client connects on its own on the next
+    /// attempt. If it goes away afterwards, the backoff starts again from 1 s.
     @Test func recoversWhenTheAgentComesBack() async throws {
         let port = try unusedLoopbackPort()
         let client = makeClient(port: port)
@@ -81,7 +81,7 @@ struct ReconnectTests {
         #expect(client.scheduledRetryDelay == .seconds(1), "Conectar reinicia el backoff")
     }
 
-    /// Un dispositivo revocado no reintenta: su clave ya no sirve.
+    /// A revoked device doesn't retry: its key no longer works.
     @Test func doesNotRetryAfterNotPaired() async throws {
         let agent = FakeAgent()
         let server = LevelDeckServer(security: .tlsPSK(TestKeys.serverSet), advertise: false)
@@ -117,7 +117,7 @@ struct ReconnectTests {
         )
     }
 
-    /// Espera a que el intento en curso falle y quede programado el siguiente.
+    /// Waits for the in-flight attempt to fail and the next one to be scheduled.
     private func waitForRetry(_ client: LevelDeckClient, afterFailures failures: Int) async throws {
         let clock = clock
         try await waitUntil("queda programado el reintento tras \(failures) fallos") {

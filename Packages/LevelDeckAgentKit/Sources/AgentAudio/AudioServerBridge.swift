@@ -1,7 +1,7 @@
 import LevelDeckKit
 
-/// Conecta el `AudioModel` con el servidor de red (SPEC §5.2–5.3): arma el `state` y aplica
-/// los comandos de los clientes con las mismas reglas que el menú.
+/// Connects the `AudioModel` to the network server (SPEC §5.2–5.3): builds the `state` and
+/// applies client commands with the same rules as the menu.
 @MainActor
 public final class AudioServerBridge: LevelDeckServerDelegate {
     private let audio: AudioModel
@@ -29,7 +29,7 @@ public final class AudioServerBridge: LevelDeckServerDelegate {
         case let .setDefaultDevice(scope, deviceId):
             audio.setDefaultDevice(deviceId, scope: scope)
         }
-        // `AudioModel` fija `lastError` en todos los caminos: `nil` si la escritura se aplicó.
+        // `AudioModel` sets `lastError` on every path: `nil` if the write was applied.
         return audio.lastError.map(Self.agentError)
     }
 
@@ -50,7 +50,7 @@ public final class AudioServerBridge: LevelDeckServerDelegate {
 }
 
 extension ChannelState {
-    /// Proyección al protocolo del canal que ve el agente.
+    /// Protocol projection of the channel the agent sees.
     public init(_ channel: AudioChannel) {
         self.init(
             deviceId: channel.deviceId, deviceName: channel.deviceName,

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Opción del menú para abrir el agente al iniciar sesión (SPEC §5.1).
+/// Menu option to open the agent at login (SPEC §5.1).
 struct LoginItemView: View {
     let loginItem: LoginItem
 

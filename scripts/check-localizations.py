@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Verifica que cada texto localizable de las apps tenga traducción al español.
+"""Verifies that every localizable string in the apps has a Spanish translation.
 
-Lee las claves que el compilador extrae del código (`*.stringsdata`, SWIFT_EMIT_LOC_STRINGS)
-en los builds de verify.sh y las compara con los String Catalogs. También comprueba que los
-bundles incluyan `es.lproj`. Falla si no encuentra `.stringsdata`, para no pasar en falso.
+Reads the keys the compiler extracts from the code (`*.stringsdata`, SWIFT_EMIT_LOC_STRINGS)
+in verify.sh's builds and compares them with the String Catalogs. Also checks that the
+bundles include `es.lproj`. Fails if it finds no `.stringsdata`, so it can't pass falsely.
 """
 import glob
 import json
@@ -12,7 +12,7 @@ import sys
 
 DERIVED = "build/DerivedData"
 TARGETS = {
-    # target: (fragmento de ruta de sus intermedios, carpeta de fuentes, bundles construidos)
+    # target: (path fragment of its intermediates, source folder, built bundles)
     "LevelDeck": (
         "-iphonesimulator/LevelDeck.build/",
         "LevelDeck",
@@ -48,24 +48,24 @@ failures = []
 for target, (fragment, folder, bundles) in TARGETS.items():
     paths, keys = extracted_keys(fragment)
     if not paths:
-        failures.append(f"{target}: no hay .stringsdata (¿SWIFT_EMIT_LOC_STRINGS?)")
+        failures.append(f"{target}: no .stringsdata found (SWIFT_EMIT_LOC_STRINGS?)")
         continue
     for table, table_keys in sorted(keys.items()):
         catalog_path = os.path.join(folder, f"{table}.xcstrings")
         if not os.path.exists(catalog_path):
-            failures.append(f"{target}: falta {catalog_path} para {len(table_keys)} claves")
+            failures.append(f"{target}: missing {catalog_path} for {len(table_keys)} keys")
             continue
         with open(catalog_path, encoding="utf-8") as f:
             catalog = json.load(f)
         missing = sorted(k for k in table_keys if not translated(catalog, k))
         for key in missing:
-            failures.append(f"{target}: sin traducción al español en {table}: {key!r}")
-        print(f"    {target}/{table}: {len(table_keys)} claves, {len(missing)} sin traducir")
+            failures.append(f"{target}: no Spanish translation in {table}: {key!r}")
+        print(f"    {target}/{table}: {len(table_keys)} keys, {len(missing)} untranslated")
     for bundle in bundles:
         for name in ("Localizable.strings", "InfoPlist.strings"):
             path = f"{DERIVED}/Build/Products/{bundle}/es.lproj/{name}"
             if not os.path.exists(path):
-                failures.append(f"{target}: falta {path}")
+                failures.append(f"{target}: missing {path}")
 
 if failures:
     print("\n".join(f"ERROR: {f}" for f in failures), file=sys.stderr)

@@ -1,13 +1,13 @@
-/// Tiempos de sincronización del fader (SPEC §6.2 y §8).
+/// Fader sync timings (SPEC §6.2 and §8).
 public enum SyncTiming {
-    /// Máximo 30 envíos por segundo, tanto `setVolume` del cliente como `state` del agente.
+    /// At most 30 sends per second, both the client's `setVolume` and the agent's `state`.
     public static let minSendInterval: Duration = .seconds(1) / 30
-    /// Tras soltar el fader, sus eventos de estado se siguen ignorando este tiempo.
+    /// After releasing the fader, its state events keep being ignored for this long.
     public static let echoHold: Duration = .milliseconds(300)
 }
 
 extension Duration {
-    /// Para mostrar en pantalla (overlay de RTT).
+    /// For on-screen display (RTT overlay).
     public var milliseconds: Double {
         let (seconds, attoseconds) = components
         return Double(seconds) * 1_000 + Double(attoseconds) / 1e15

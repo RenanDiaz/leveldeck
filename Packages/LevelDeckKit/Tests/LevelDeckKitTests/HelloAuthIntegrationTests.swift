@@ -3,9 +3,9 @@ import Foundation
 import Testing
 @testable import LevelDeckKit
 
-/// Challenge-response del `hello` (Fase 5, SPEC §8) en loopback con `PairingManager`: el
-/// `deviceId` ya no es una declaración. Un dispositivo emparejado que dice ser otro se
-/// rechaza, y por eso tampoco puede sobrevivir a su propia revocación en caliente.
+/// `hello` challenge-response (Phase 5, SPEC §8) over loopback with `PairingManager`: the
+/// `deviceId` is no longer just a claim. A paired device claiming to be another one is
+/// rejected, and so it also can't survive its own live revocation.
 @MainActor
 @Suite("Challenge-response del hello", .serialized)
 struct HelloAuthIntegrationTests {
@@ -25,9 +25,9 @@ struct HelloAuthIntegrationTests {
         try await waitUntil("el listener queda listo") { server.port != nil }
     }
 
-    /// El iPhone pasa el handshake TLS con su propia clave, pero declara el `deviceId` del iPad
-    /// y firma el `nonce` con lo único que tiene, su clave. El agente lo rechaza y el iPad
-    /// sigue conectado.
+    /// The iPhone passes the TLS handshake with its own key, but claims the iPad's `deviceId`
+    /// and signs the `nonce` with the only thing it has, its own key. The agent rejects it and the
+    /// iPad stays connected.
     @Test func clientClaimingAnotherDeviceIdIsRejected() async throws {
         defer { server.stop() }
         let phone = try await pair(name: "iPhone")
@@ -52,8 +52,8 @@ struct HelloAuthIntegrationTests {
         #expect(pairing.devices.first { $0.id == pad.deviceID }?.name == "iPad", "El nombre del iPad no cambió")
     }
 
-    /// Antes del challenge, un iPhone revocado podía seguir conectado declarándose como el
-    /// iPad. Ahora solo puede conectar como sí mismo, así que revocarlo lo desconecta.
+    /// Before the challenge, a revoked iPhone could stay connected by claiming to be the
+    /// iPad. Now it can only connect as itself, so revoking it disconnects it.
     @Test func deviceCannotSurviveItsOwnRevocation() async throws {
         defer { server.stop() }
         let phone = try await pair(name: "iPhone")
@@ -88,7 +88,7 @@ struct HelloAuthIntegrationTests {
         #expect(server.clients.isEmpty)
     }
 
-    /// Una prueba válida de una sesión anterior no sirve en otra: el `nonce` cambia.
+    /// A valid proof from a previous session doesn't work in another: the `nonce` changes.
     @Test func replayedProofIsRejected() async throws {
         defer { server.stop() }
         let phone = try await pair(name: "iPhone")
@@ -110,7 +110,7 @@ struct HelloAuthIntegrationTests {
         try await secondMessages.nextError(.notPaired)
     }
 
-    /// Un cliente que pasa el TLS pero nunca responde el `challenge` no ocupa una sesión.
+    /// A client that passes TLS but never answers the `challenge` doesn't hold a session.
     @Test func silentClientIsClosedByTimeout() async throws {
         defer { server.stop() }
         let phone = try await pair(name: "iPhone")

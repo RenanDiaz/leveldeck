@@ -1,15 +1,15 @@
-/// Limita la frecuencia de envíos sin perder el último valor (SPEC §6.2).
+/// Limits the send rate without losing the last value (SPEC §6.2).
 ///
-/// El primer valor sale de inmediato. Los siguientes dentro del intervalo se agrupan y sale
-/// solo el más reciente cuando vence. `finish` envía el valor final sin esperar.
-/// Es lógica pura con el tiempo explícito; `ThrottledSender` le pone el reloj.
+/// The first value goes out immediately. Later ones within the interval are coalesced and
+/// only the most recent goes out when it expires. `finish` sends the final value without waiting.
+/// It is pure logic with explicit time; `ThrottledSender` provides the clock.
 public struct SendThrottle<Value: Equatable & Sendable>: Sendable {
     public enum Decision: Equatable, Sendable {
-        /// Enviar ahora.
+        /// Send now.
         case send(Value)
-        /// Programar un `fire(now:)` para ese instante.
+        /// Schedule a `fire(now:)` for that instant.
         case schedule(at: ContinuousClock.Instant)
-        /// Nada que hacer: ya hay un envío programado o el valor no cambió.
+        /// Nothing to do: a send is already scheduled or the value did not change.
         case wait
     }
 
@@ -38,7 +38,7 @@ public struct SendThrottle<Value: Equatable & Sendable>: Sendable {
         return .send(value)
     }
 
-    /// Vence el intervalo programado. Devuelve el valor a enviar, si hay.
+    /// The scheduled interval expires. Returns the value to send, if any.
     public mutating func fire(now: ContinuousClock.Instant) -> Value? {
         guard let value = pending else { return nil }
         pending = nil
@@ -47,7 +47,7 @@ public struct SendThrottle<Value: Equatable & Sendable>: Sendable {
         return value
     }
 
-    /// Fin de la interacción: descarta lo pendiente y devuelve el valor final si hace falta enviarlo.
+    /// End of the interaction: discards anything pending and returns the final value if it needs sending.
     public mutating func finish(_ value: Value, now: ContinuousClock.Instant) -> Value? {
         pending = nil
         guard value != lastSent else { return nil }
@@ -55,14 +55,14 @@ public struct SendThrottle<Value: Equatable & Sendable>: Sendable {
         return value
     }
 
-    /// Descarta lo pendiente sin enviar nada (p. ej. el arrastre quedó invalidado porque
-    /// cambió el dispositivo, SPEC §6.2).
+    /// Discards anything pending without sending (e.g. the drag was invalidated because
+    /// the device changed, SPEC §6.2).
     public mutating func cancel() {
         pending = nil
     }
 
-    /// Olvida el último valor enviado, pero no cuándo. Se llama al empezar un arrastre: el otro
-    /// lado pudo cambiar desde entonces y volver al mismo valor debe enviarse igual.
+    /// Forgets the last value sent, but not when. Called when a drag starts: the other
+    /// side may have changed since then, and returning to the same value must still be sent.
     public mutating func forgetLastValue() {
         lastSent = nil
     }
@@ -73,7 +73,7 @@ public struct SendThrottle<Value: Equatable & Sendable>: Sendable {
     }
 }
 
-/// `SendThrottle` con reloj real: programa el envío diferido con una `Task`.
+/// `SendThrottle` with a real clock: schedules the deferred send with a `Task`.
 @MainActor
 public final class ThrottledSender<Value: Equatable & Sendable> {
     private var throttle: SendThrottle<Value>
@@ -107,7 +107,7 @@ public final class ThrottledSender<Value: Equatable & Sendable> {
         }
     }
 
-    /// Descarta lo pendiente y el envío programado, sin enviar nada.
+    /// Discards anything pending and the scheduled send, without sending anything.
     public func cancel() {
         timer?.cancel()
         timer = nil

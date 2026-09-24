@@ -1,9 +1,9 @@
 import Foundation
 
-/// Mensajes Agente → Cliente (SPEC §8).
+/// Agent → Client messages (SPEC §8).
 public enum AgentMessage: Sendable, Equatable {
-    /// Primer mensaje de cada sesión: el cliente responde con un `hello` cuya `proof` firma
-    /// este `nonce` (SPEC §8). El cliente lo consume y no lo publica.
+    /// First message of every session: the client answers with a `hello` whose `proof` signs
+    /// this `nonce` (SPEC §8). The client consumes it and does not publish it.
     case challenge(nonce: Data)
     case state(StateSnapshot, version: Int = ProtocolVersion.current)
     case error(code: ErrorCode, message: String)
@@ -31,7 +31,7 @@ extension AgentMessage: Codable {
             }
             self = .challenge(nonce: nonce)
         case .state:
-            // `null` = sin dispositivo; la clave ausente sigue siendo un error de decodificación.
+            // `null` = no device; a missing key is still a decoding error.
             let snapshot = StateSnapshot(
                 output: try container.decode(ChannelState?.self, forKey: .output),
                 input: try container.decode(ChannelState?.self, forKey: .input),
@@ -53,7 +53,7 @@ extension AgentMessage: Codable {
             try container.encode(MessageType.challenge, forKey: .type)
             try container.encode(nonce.base64URLEncodedString(), forKey: .nonce)
         case let .state(snapshot, version):
-            // Payload plano: los campos del snapshot van al mismo nivel que `type`.
+            // Flat payload: the snapshot fields sit at the same level as `type`.
             try container.encode(MessageType.state, forKey: .type)
             try container.encode(version, forKey: .v)
             try encodeChannel(snapshot.output, forKey: .output, in: &container)
@@ -66,7 +66,7 @@ extension AgentMessage: Codable {
         }
     }
 
-    /// Canal ausente = clave presente con `null`, nunca omitida (SPEC §8).
+    /// Missing channel = key present with `null`, never omitted (SPEC §8).
     private func encodeChannel(
         _ channel: ChannelState?, forKey key: CodingKeys,
         in container: inout KeyedEncodingContainer<CodingKeys>

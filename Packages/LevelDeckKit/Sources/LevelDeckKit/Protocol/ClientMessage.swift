@@ -1,10 +1,10 @@
 import Foundation
 
-/// Mensajes Cliente → Agente (SPEC §8).
+/// Client → Agent messages (SPEC §8).
 public enum ClientMessage: Sendable, Equatable {
-    /// `deviceId` es la identidad PSK que la Mac asignó al emparejar (SPEC §7) y `proof` el
-    /// HMAC del `nonce` del `challenge` con la clave de ese `deviceId` (`HelloProof`, SPEC §8).
-    /// Ambos van siempre con TLS-PSK; solo faltan en el transporte en claro de desarrollo.
+    /// `deviceId` is the PSK identity the Mac assigned when pairing (SPEC §7) and `proof` the
+    /// HMAC of the `challenge`'s `nonce` with that `deviceId`'s key (`HelloProof`, SPEC §8).
+    /// Both are always present with TLS-PSK; they are missing only in the development cleartext transport.
     case hello(deviceName: String, version: Int = ProtocolVersion.current, deviceId: String? = nil, proof: Data? = nil)
     case setVolume(scope: Scope, value: Float)
     case setMute(scope: Scope, muted: Bool)
@@ -94,7 +94,7 @@ extension ClientMessage: Codable {
 }
 
 public enum Volume {
-    /// 0.0–1.0 inclusive. `NaN` no pasa.
+    /// 0.0–1.0 inclusive. `NaN` does not pass.
     public static func isValid(_ value: Float) -> Bool {
         (0...1).contains(value)
     }

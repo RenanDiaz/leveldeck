@@ -4,15 +4,15 @@ import CoreAudio
 import Dispatch
 import LevelDeckKit
 
-/// `AudioControlling` real sobre CoreAudio (SPEC §5.2).
+/// Real `AudioControlling` on top of CoreAudio (SPEC §5.2).
 ///
-/// Los listeners se registran en la cola principal, así que `onChange` siempre se entrega
-/// en el main actor. Al cambiar el dispositivo por defecto de un scope, los listeners de
-/// ese scope se mueven al dispositivo nuevo. Un cambio en la lista de dispositivos (conectar
-/// o desconectar algo) se avisa para ambos scopes; si desaparece el activo, el dispositivo
-/// que elija macOS llega por el listener del default. Si `coreaudiod` se reinicia, todos
-/// los listeners quedan inválidos: `kAudioHardwarePropertyServiceRestarted` los vuelve a
-/// suscribir y avisa ambos scopes.
+/// Listeners are registered on the main queue, so `onChange` is always delivered
+/// on the main actor. When a scope's default device changes, that scope's listeners
+/// move to the new device. A change in the device list (connecting or disconnecting
+/// something) is notified for both scopes; if the active one disappears, the device macOS
+/// picks arrives through the default listener. If `coreaudiod` restarts, all
+/// listeners become invalid: `kAudioHardwarePropertyServiceRestarted` resubscribes
+/// them and notifies both scopes.
 @MainActor
 public final class CoreAudioController: AudioControlling {
     private struct Listener {
@@ -25,8 +25,8 @@ public final class CoreAudioController: AudioControlling {
     private var onChange: (@MainActor (Scope) -> Void)?
     private var systemListeners: [Listener] = []
     private var deviceListeners: [Scope: [Listener]] = [:]
-    /// Listeners vigentes. Un bloque que la HAL todavía entregue después de quitarlo
-    /// (p. ej. porque el dispositivo ya no existía) se ignora.
+    /// Active listeners. A block the HAL still delivers after it has been removed
+    /// (e.g. because the device no longer existed) is ignored.
     private var activeListeners: Set<UInt64> = []
     private var nextListenerID: UInt64 = 0
 
@@ -71,8 +71,8 @@ public final class CoreAudioController: AudioControlling {
     public func devices(_ scope: Scope) throws(AudioControlError) -> [DeviceInfo] {
         var devices: [DeviceInfo] = []
         for device in try HAL.allDevices() where Self.isSelectable(device, scope) {
-            // Un dispositivo que desaparece a mitad de la lectura se salta; el listener de la
-            // lista avisa de nuevo enseguida.
+            // A device that disappears mid-read is skipped; the list listener
+            // notifies again right away.
             guard let uid = try? HAL.string(device, kAudioDevicePropertyDeviceUID),
                   let name = try? HAL.string(device, kAudioObjectPropertyName) else { continue }
             devices.append(DeviceInfo(id: uid, name: name))
@@ -87,8 +87,8 @@ public final class CoreAudioController: AudioControlling {
         try HAL.setDefaultDevice(device, scope)
     }
 
-    /// Visible y con streams en el scope (SPEC §5.2). Los virtuales (BlackHole, Zoom, Teams)
-    /// pasan si cumplen eso.
+    /// Visible and with streams in the scope (SPEC §5.2). Virtual ones (BlackHole, Zoom, Teams)
+    /// pass if they meet that.
     private static func isSelectable(_ device: AudioObjectID, _ scope: Scope) -> Bool {
         HAL.hasStreams(device, scope) && !HAL.isHidden(device)
     }
@@ -99,7 +99,7 @@ public final class CoreAudioController: AudioControlling {
         if let listener = addServiceRestartedListener() {
             systemListeners.append(listener)
         }
-        // La lista de dispositivos es del sistema y afecta a ambos scopes.
+        // The device list is system-wide and affects both scopes.
         if let listener = addListener(
             HAL.systemObject, HAL.address(kAudioHardwarePropertyDevices),
             scopes: Scope.allCases, defaultDeviceChanged: false
@@ -138,7 +138,7 @@ public final class CoreAudioController: AudioControlling {
         }
     }
 
-    /// `coreaudiod` se reinició: los listeners viejos ya no existen del lado de la HAL.
+    /// `coreaudiod` restarted: the old listeners no longer exist on the HAL side.
     private func serviceRestarted(listener: UInt64) {
         guard let onChange, activeListeners.contains(listener) else { return }
         startObserving(onChange)
@@ -163,7 +163,7 @@ public final class CoreAudioController: AudioControlling {
         return Listener(id: id, object: HAL.systemObject, address: address, block: block)
     }
 
-    /// Escucha volumen y mute del dispositivo por defecto actual del scope.
+    /// Listens to volume and mute on the scope's current default device.
     private func subscribeToDefaultDevice(_ scope: Scope) {
         unsubscribeFromDevice(scope)
         guard let device = try? HAL.defaultDevice(scope) else { return }
@@ -203,7 +203,7 @@ public final class CoreAudioController: AudioControlling {
     private func remove(_ listener: Listener) {
         activeListeners.remove(listener.id)
         var address = listener.address
-        // Falla si el dispositivo ya desapareció (p. ej. se desconectó); no hay nada que limpiar.
+        // Fails if the device is already gone (e.g. it was disconnected); nothing to clean up.
         _ = AudioObjectRemovePropertyListenerBlock(listener.object, &address, DispatchQueue.main, listener.block)
     }
 }

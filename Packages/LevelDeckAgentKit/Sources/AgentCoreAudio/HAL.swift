@@ -3,7 +3,7 @@ import AudioToolbox
 import CoreAudio
 import LevelDeckKit
 
-/// Envoltorio mínimo sobre la API de propiedades de `AudioObject`.
+/// Minimal wrapper over the `AudioObject` property API.
 enum HAL {
     static let systemObject = AudioObjectID(kAudioObjectSystemObject)
 
@@ -48,7 +48,7 @@ enum HAL {
         guard status == noErr else { throw .coreAudio(status: status) }
     }
 
-    /// Propiedad `CFString` (nombre, UID). Quien la pide es dueño de la referencia.
+    /// `CFString` property (name, UID). The caller owns the reference.
     static func string(
         _ object: AudioObjectID, _ selector: AudioObjectPropertySelector
     ) throws(AudioControlError) -> String {
@@ -57,35 +57,35 @@ enum HAL {
         return value.takeRetainedValue() as String
     }
 
-    /// Dispositivo por defecto del scope, o `nil` si no hay ninguno.
+    /// The scope's default device, or `nil` if there is none.
     static func defaultDevice(_ scope: Scope) throws(AudioControlError) -> AudioObjectID? {
         let device = try get(systemObject, address(scope.defaultDeviceSelector), initial: AudioObjectID(0))
         return device == AudioObjectID(kAudioObjectUnknown) ? nil : device
     }
 
-    /// Todos los dispositivos de la HAL, sin filtrar (`kAudioHardwarePropertyDevices`).
+    /// All HAL devices, unfiltered (`kAudioHardwarePropertyDevices`).
     static func allDevices() throws(AudioControlError) -> [AudioObjectID] {
         try array(systemObject, address(kAudioHardwarePropertyDevices))
     }
 
-    /// `true` si el dispositivo tiene al menos un stream en el scope.
+    /// `true` if the device has at least one stream in the scope.
     static func hasStreams(_ device: AudioObjectID, _ scope: Scope) -> Bool {
         var streams = address(kAudioDevicePropertyStreams, scope: scope.halScope)
         var size: UInt32 = 0
         return AudioObjectGetPropertyDataSize(device, &streams, 0, nil, &size) == noErr && size > 0
     }
 
-    /// `kAudioDevicePropertyIsHidden`. Si el dispositivo no la expone, se toma como visible.
+    /// `kAudioDevicePropertyIsHidden`. If the device doesn't expose it, it is treated as visible.
     static func isHidden(_ device: AudioObjectID) -> Bool {
         let hidden = address(kAudioDevicePropertyIsHidden)
         guard has(device, hidden) else { return false }
         return ((try? get(device, hidden, initial: UInt32(0))) ?? 0) != 0
     }
 
-    /// Dispositivo con ese UID, o `nil` si no existe (`kAudioHardwarePropertyTranslateUIDToDevice`).
+    /// Device with that UID, or `nil` if none (`kAudioHardwarePropertyTranslateUIDToDevice`).
     static func device(forUID uid: String) throws(AudioControlError) -> AudioObjectID? {
         var translate = address(kAudioHardwarePropertyTranslateUIDToDevice)
-        // El calificador es el UID como `CFString`; Swift mantiene la referencia viva.
+        // The qualifier is the UID as a `CFString`; Swift keeps the reference alive.
         var qualifier = uid as CFString
         var device = AudioObjectID(kAudioObjectUnknown)
         var size = UInt32(MemoryLayout<AudioObjectID>.size)
@@ -104,7 +104,7 @@ enum HAL {
         try set(systemObject, address(scope.defaultDeviceSelector), device)
     }
 
-    /// Propiedad de tamaño variable con elementos de tipo `T`.
+    /// Variable-size property with elements of type `T`.
     private static func array<T>(
         _ object: AudioObjectID, _ address: AudioObjectPropertyAddress
     ) throws(AudioControlError) -> [T] {
@@ -118,11 +118,11 @@ enum HAL {
         defer { buffer.deallocate() }
         status = AudioObjectGetPropertyData(object, &address, 0, nil, &size, buffer)
         guard status == noErr else { throw .coreAudio(status: status) }
-        // La lista pudo encogerse entre las dos llamadas: `size` trae lo que se escribió.
+        // The list may have shrunk between the two calls: `size` holds what was written.
         return Array(UnsafeBufferPointer(start: buffer, count: Int(size) / MemoryLayout<T>.stride))
     }
 
-    /// Número total de canales del dispositivo en el scope, según su configuración de streams.
+    /// Total number of the device's channels in the scope, per its stream configuration.
     static func channelCount(_ device: AudioObjectID, _ scope: Scope) -> Int {
         var streams = address(kAudioDevicePropertyStreamConfiguration, scope: scope.halScope)
         var size: UInt32 = 0

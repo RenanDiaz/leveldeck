@@ -2,8 +2,8 @@ import LevelDeckKit
 import SwiftUI
 import UIKit
 
-/// Lista de Macs encontradas por Bonjour (SPEC §6.1). Las emparejadas se conectan solas; las
-/// demás ofrecen "Emparejar" y abren la cámara.
+/// List of Macs found over Bonjour (SPEC §6.1). Paired ones connect on their own; the
+/// rest offer "Pair" and open the camera.
 struct DiscoveryView: View {
     let pairedAgents: PairedAgents
 
@@ -91,8 +91,8 @@ struct DiscoveryView: View {
         .onAppear { browser.start() }
         .onChange(of: browser.agents) { autoConnectIfPossible() }
         .onChange(of: scenePhase) { _, phase in
-            // En segundo plano se cierra la conexión; al volver, se reconecta de inmediato
-            // sin esperar el backoff (SPEC §6.2).
+            // In the background the connection is closed; on return, it reconnects immediately
+            // without waiting for the backoff (SPEC §6.2).
             switch phase {
             case .background:
                 mixer?.suspend()
@@ -162,8 +162,8 @@ struct DiscoveryView: View {
         agent.agentID.flatMap { pairedAgents.agent(id: $0) }
     }
 
-    /// Conecta con una Mac recién emparejada, si ya está en la lista; si no, se conectará
-    /// sola cuando aparezca.
+    /// Connects to a just-paired Mac if it's already in the list; otherwise it will connect
+    /// on its own when it shows up.
     private func connect(to paired: PairedAgent) {
         lastAgentID = paired.id
         didAutoConnect = false
@@ -181,7 +181,7 @@ struct DiscoveryView: View {
         )
         let model = MixerModel(agentName: agent.name, client: client)
         model.onUnpaired = {
-            // La Mac revocó este iPhone: su clave ya no sirve.
+            // The Mac revoked this iPhone: its key no longer works.
             pairedAgents.forget(id: paired.id)
             mixer?.disconnect()
             mixer = nil
@@ -205,7 +205,7 @@ struct DiscoveryView: View {
     }
 }
 
-/// Fallo del Keychain, localizado; el detalle técnico solo en Debug (SPEC §3).
+/// Keychain failure, localized; technical detail only in Debug (SPEC §3).
 struct KeychainErrorLabel: View {
     let error: PairingStoreError
 
