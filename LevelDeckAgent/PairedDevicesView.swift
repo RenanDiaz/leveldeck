@@ -1,7 +1,7 @@
 import LevelDeckKit
 import SwiftUI
 
-/// Dispositivos emparejados en el menú (SPEC §5.1, §7): nombre, si está conectado y revocar.
+/// Paired devices in the menu (SPEC §5.1, §7): name, whether it's connected, and revoke.
 struct PairedDevicesView: View {
     let pairing: PairingManager
 
@@ -45,7 +45,7 @@ struct PairedDevicesView: View {
     }
 }
 
-/// Fallo del Keychain, localizado; el detalle técnico solo en Debug (SPEC §3).
+/// Keychain failure, localized; technical detail only in Debug (SPEC §3).
 struct KeychainErrorView: View {
     let error: PairingStoreError
 

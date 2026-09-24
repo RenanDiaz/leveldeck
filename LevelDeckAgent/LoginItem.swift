@@ -2,23 +2,23 @@ import Foundation
 import Observation
 import ServiceManagement
 
-/// Login item del agente con `SMAppService.mainApp` (SPEC §5.1).
+/// The agent's login item via `SMAppService.mainApp` (SPEC §5.1).
 ///
-/// Se registra solo una vez, en el primer arranque de un build Release; si después el
-/// usuario lo desactiva, no se vuelve a activar. En Debug no se registra solo: registraría el
-/// `.app` de DerivedData, que cambia de ruta entre builds.
+/// It registers itself only once, on the first launch of a Release build; if the user later
+/// turns it off, it isn't turned back on. In Debug it doesn't register itself: it would register the
+/// DerivedData `.app`, whose path changes between builds.
 @MainActor
 @Observable
 final class LoginItem {
     enum Status: Equatable {
         case enabled
         case disabled
-        /// Registrado, pero macOS pide aprobarlo en Ajustes del Sistema › Ítems de inicio.
+        /// Registered, but macOS asks for approval in System Settings › Login Items.
         case requiresApproval
     }
 
     private(set) var status: Status = .disabled
-    /// Detalle técnico del último fallo al registrar o quitar; el menú muestra un texto fijo.
+    /// Technical detail of the last failure to register or unregister; the menu shows fixed text.
     private(set) var failure: String?
 
     private static let didAutoRegisterKey = "loginItem.didAutoRegister"
@@ -27,7 +27,7 @@ final class LoginItem {
         refresh()
     }
 
-    /// El estado puede cambiar desde Ajustes del Sistema: se relee al abrir el menú.
+    /// The status can change from System Settings: it's re-read when the menu opens.
     func refresh() {
         switch SMAppService.mainApp.status {
         case .enabled:
