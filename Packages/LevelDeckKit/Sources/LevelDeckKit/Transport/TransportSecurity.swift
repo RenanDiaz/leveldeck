@@ -6,25 +6,25 @@ import Security
 #error("LEVELDECK_INSECURE_TRANSPORT solo se permite en builds Debug (SPEC §5.3).")
 #endif
 
-/// Cómo se protege la conexión entre el agente y el cliente.
+/// How the connection between the agent and the client is protected.
 ///
-/// Es lo único que cambia entre un transporte y otro: servidor, cliente y apps solo
-/// reciben un valor de este tipo.
+/// It's the only thing that differs between one transport and another: server, client and
+/// apps just receive a value of this type.
 public enum TransportSecurity: Sendable {
     #if LEVELDECK_INSECURE_TRANSPORT
-    /// TCP + WebSocket sin cifrar. Solo existe en builds Debug de `LevelDeckKit`, para
-    /// inspeccionar el protocolo en tests; las apps no lo usan (SPEC §5.3).
+    /// Unencrypted TCP + WebSocket. Only exists in Debug builds of `LevelDeckKit`, to
+    /// inspect the protocol in tests; the apps don't use it (SPEC §5.3).
     case insecurePlaintext
     #endif
 
-    /// TLS 1.2 con pre-shared key (SPEC §5.3, §7). El servidor pasa una clave por dispositivo
-    /// emparejado (más la pendiente durante el emparejamiento); el cliente, solo la suya. Una
-    /// conexión cuya identidad o clave no está en el conjunto no pasa el handshake.
+    /// TLS 1.2 with a pre-shared key (SPEC §5.3, §7). The server passes one key per paired
+    /// device (plus the pending one during pairing); the client, only its own. A connection
+    /// whose identity or key isn't in the set fails the handshake.
     case tlsPSK(PresharedKeySet)
 }
 
 extension TransportSecurity {
-    /// `true` si el WebSocket va sobre TLS (`wss://`).
+    /// `true` if the WebSocket runs over TLS (`wss://`).
     var usesTLS: Bool {
         switch self {
         #if LEVELDECK_INSECURE_TRANSPORT
@@ -49,13 +49,13 @@ extension TransportSecurity {
 }
 
 extension NWProtocolTLS.Options {
-    /// `TLS_PSK_WITH_AES_128_GCM_SHA256` (RFC 5487), el ciphersuite PSK que Network.framework
-    /// negocia. Es de TLS 1.2: Network.framework no ofrece PSK externas en TLS 1.3 (ahí las
-    /// PSK son solo de reanudación), así que la versión se fija en 1.2 (SPEC §5.3).
+    /// `TLS_PSK_WITH_AES_128_GCM_SHA256` (RFC 5487), the PSK ciphersuite Network.framework
+    /// negotiates. It's a TLS 1.2 suite: Network.framework doesn't offer external PSKs in TLS 1.3
+    /// (there PSKs are resumption-only), so the version is pinned to 1.2 (SPEC §5.3).
     static let pskCiphersuite: UInt16 = 0x00A8
 
-    /// TLS-PSK con las claves dadas. En el servidor, la identidad que manda el cliente en el
-    /// handshake elige la clave; una identidad desconocida o una clave distinta lo abortan.
+    /// TLS-PSK with the given keys. On the server, the identity the client sends in the
+    /// handshake picks the key; an unknown identity or a different key aborts it.
     static func presharedKeys(_ keys: PresharedKeySet) -> NWProtocolTLS.Options {
         let options = NWProtocolTLS.Options()
         let security = options.securityProtocolOptions
@@ -70,11 +70,11 @@ extension NWProtocolTLS.Options {
         }
         sec_protocol_options_set_min_tls_protocol_version(security, .TLSv12)
         sec_protocol_options_set_max_tls_protocol_version(security, .TLSv12)
-        // Sin reanudación de sesión ni tickets: cada conexión hace el handshake PSK completo.
-        // Con reanudación, un cliente del mismo proceso que ya tuvo una sesión válida con ese
-        // host:puerto la reanuda sin volver a probar la clave (lo detectaron los tests de
-        // rechazo en loopback), y un dispositivo revocado podría seguir entrando mientras su
-        // ticket viva. La seguridad no debe depender de que el puerto cambie.
+        // No session resumption or tickets: every connection does the full PSK handshake.
+        // With resumption, a client in the same process that already had a valid session with that
+        // host:port resumes it without proving the key again (caught by the loopback rejection
+        // tests), and a revoked device could keep getting in while its ticket is alive.
+        // Security must not depend on the port changing.
         sec_protocol_options_set_tls_resumption_enabled(security, false)
         sec_protocol_options_set_tls_tickets_enabled(security, false)
         return options
@@ -86,14 +86,14 @@ extension NWProtocolTLS.Options {
 }
 
 extension NWParameters {
-    /// TCP (+ TLS cuando lo haya) + WebSocket, que da el framing de mensajes (SPEC §5.3).
+    /// TCP (+ TLS when present) + WebSocket, which provides message framing (SPEC §5.3).
     static func levelDeck(tls: NWProtocolTLS.Options?) -> NWParameters {
         let tcp = NWProtocolTCP.Options()
-        // Mensajes chicos e interactivos: sin Nagle, cada frame sale en cuanto se envía.
+        // Small, interactive messages: no Nagle, each frame goes out as soon as it's sent.
         tcp.noDelay = true
-        // Keepalive: si el otro lado desaparece sin cerrar (la Mac se durmió, se apagó el
-        // Wi-Fi), la conexión se da por muerta en ~11 s en vez de minutos. Sin esto, el
-        // iPhone no empieza a reconectar y la Mac lista clientes fantasma (SPEC §5.3).
+        // Keepalive: if the other side disappears without closing (the Mac went to sleep, Wi-Fi
+        // was turned off), the connection is declared dead in ~11 s instead of minutes. Without
+        // this, the iPhone doesn't start reconnecting and the Mac lists ghost clients (SPEC §5.3).
         tcp.enableKeepalive = true
         tcp.keepaliveIdle = 5
         tcp.keepaliveInterval = 2
@@ -106,11 +106,11 @@ extension NWParameters {
     }
 }
 
-/// Constantes del servicio en la red local.
+/// Constants for the service on the local network.
 public enum LevelDeckService {
-    /// Tipo de servicio Bonjour. Debe coincidir con `NSBonjourServices` del cliente iOS.
+    /// Bonjour service type. Must match the iOS client's `NSBonjourServices`.
     public static let bonjourType = "_leveldeck._tcp"
-    /// Clave del registro TXT con el `agentId` de la Mac, para que el iPhone sepa qué clave
-    /// usar sin depender del nombre (que puede cambiar o llevar sufijo).
+    /// TXT record key holding the Mac's `agentId`, so the iPhone knows which key to use
+    /// without relying on the name (which can change or get a suffix).
     public static let txtAgentIDKey = "id"
 }

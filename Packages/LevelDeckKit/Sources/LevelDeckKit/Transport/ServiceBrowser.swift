@@ -2,17 +2,17 @@ import Foundation
 @preconcurrency import Network
 import Observation
 
-/// Descubre agentes en la red local por Bonjour (`_leveldeck._tcp`), sin configurar IP.
+/// Discovers agents on the local network via Bonjour (`_leveldeck._tcp`), with no IP setup.
 ///
-/// Si el browser falla (p. ej. al apagar el Wi-Fi), se reintenta con `Backoff`;
-/// `restartIfNeeded()` lo reintenta ya (al volver la app al frente).
+/// If the browser fails (e.g. when Wi-Fi is turned off), it retries with `Backoff`;
+/// `restartIfNeeded()` retries right away (when the app returns to the foreground).
 @MainActor
 @Observable
 public final class ServiceBrowser {
     public struct Agent: Identifiable, Hashable {
         public let name: String
         public let endpoint: NWEndpoint
-        /// `agentId` del registro TXT (SPEC §7). `nil` si el agente no lo anuncia.
+        /// `agentId` from the TXT record (SPEC §7). `nil` if the agent doesn't advertise it.
         public let agentID: String?
         public var id: String { name }
     }
@@ -20,7 +20,7 @@ public final class ServiceBrowser {
     public enum Status: Equatable, Sendable {
         case idle
         case browsing
-        /// En iOS, típicamente el permiso de red local denegado.
+        /// On iOS, typically the local network permission being denied.
         case waiting(NetworkIssue)
         case failed(NetworkIssue)
     }
@@ -37,8 +37,8 @@ public final class ServiceBrowser {
 
     public func start() {
         guard browser == nil else { return }
-        // `bonjourWithTXTRecord`: el descriptor `bonjour` plano no entrega el TXT, y sin él el
-        // iPhone no puede leer el `agentId` de la Mac (SPEC §5.3, §7).
+        // `bonjourWithTXTRecord`: the plain `bonjour` descriptor doesn't deliver the TXT, and without
+        // it the iPhone can't read the Mac's `agentId` (SPEC §5.3, §7).
         let browser = NWBrowser(
             for: .bonjourWithTXTRecord(type: LevelDeckService.bonjourType, domain: nil),
             using: NWParameters()
@@ -54,11 +54,11 @@ public final class ServiceBrowser {
         browser.start(queue: .main)
     }
 
-    /// Si el browser falló o quedó esperando la red, lo recrea ahora. No toca uno que funciona.
+    /// If the browser failed or is waiting for the network, recreates it now. Leaves a working one alone.
     public func restartIfNeeded() {
         switch status {
         case .idle, .browsing:
-            // Detenido a propósito, o funcionando.
+            // Stopped on purpose, or working.
             return
         case .waiting, .failed:
             break
@@ -117,7 +117,7 @@ public final class ServiceBrowser {
     }
 
     private func update(_ results: Set<NWBrowser.Result>) {
-        // La misma Mac puede aparecer por varias interfaces; se queda una entrada por nombre.
+        // The same Mac can show up on several interfaces; keep one entry per name.
         var byName: [String: Agent] = [:]
         for result in results {
             guard case let .service(name, _, _, _) = result.endpoint, byName[name] == nil else { continue }

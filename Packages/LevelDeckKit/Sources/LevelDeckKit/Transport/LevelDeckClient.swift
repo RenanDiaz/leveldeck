@@ -2,7 +2,7 @@ import Foundation
 @preconcurrency import Network
 import Observation
 
-/// Cómo reintenta el cliente cuando la conexión se pierde (SPEC §6.2).
+/// How the client retries when the connection is lost (SPEC §6.2).
 public struct ReconnectPolicy: Equatable, Sendable {
     public var backoff: Backoff
 
@@ -11,41 +11,41 @@ public struct ReconnectPolicy: Equatable, Sendable {
     }
 }
 
-/// Cliente del agente: conecta, responde el `challenge` con el `hello` y publica los mensajes
-/// que llegan.
+/// The agent's client: connects, answers the `challenge` with `hello` and publishes incoming
+/// messages.
 ///
-/// Con `reconnect`, si la conexión se pierde o no se puede abrir, reintenta solo con
-/// `Backoff` (1 s, 2 s, 4 s… máximo 10 s) y muestra `.reconnecting`. No reintenta cuando el
-/// agente rechazó a este dispositivo (`notPaired`, `unsupportedVersion`) ni cuando falla el
-/// handshake TLS (la Mac no reconoce la clave): esos quedan en `.disconnected`.
-/// `reconnectNow()` salta la espera (p. ej. al volver la app al frente). El reloj se inyecta
-/// para probar los intervalos sin esperar de verdad.
+/// With `reconnect`, if the connection is lost or can't be opened, it retries on its own with
+/// `Backoff` (1 s, 2 s, 4 s… up to 10 s) and shows `.reconnecting`. It doesn't retry when the
+/// agent rejected this device (`notPaired`, `unsupportedVersion`) or when the TLS handshake
+/// fails (the Mac doesn't recognize the key): those stay in `.disconnected`.
+/// `reconnectNow()` skips the wait (e.g. when the app returns to the foreground). The clock is
+/// injected to test the intervals without actually waiting.
 @MainActor
 @Observable
 public final class LevelDeckClient {
     public enum Status: Equatable, Sendable {
         case idle
         case connecting
-        /// La conexión no avanza; en iOS suele ser el permiso de red local denegado.
+        /// The connection isn't progressing; on iOS it's usually the local network permission denied.
         case waiting(NetworkIssue)
-        /// Llegó el primer `state` tras el `hello`.
+        /// The first `state` after `hello` arrived.
         case connected
-        /// Se perdió la conexión (o no se pudo abrir) y se está reintentando. `attempt` cuenta
-        /// los fallos seguidos; `issue` es el último problema, si hubo uno.
+        /// The connection was lost (or couldn't be opened) and it's retrying. `attempt` counts
+        /// consecutive failures; `issue` is the latest problem, if there was one.
         case reconnecting(attempt: Int, issue: NetworkIssue?)
-        /// `nil` si se desconectó sin error (p. ej. el agente cerró la sesión).
+        /// `nil` if it disconnected without an error (e.g. the agent closed the session).
         case disconnected(NetworkIssue?)
     }
 
-    /// Cuánto espera, con la conexión abierta, a que el `challenge` y el `state` lleguen.
+    /// How long it waits, with the connection open, for the `challenge` and the `state` to arrive.
     public nonisolated static let defaultHandshakeTimeout: Duration = .seconds(5)
 
     public private(set) var status: Status = .idle
     public private(set) var state: StateSnapshot?
     public private(set) var lastError: AgentError?
 
-    /// Cada mensaje del agente, en orden, después de actualizar `state` y `lastError`. El
-    /// `challenge` no se publica: lo consume el cliente.
+    /// Every message from the agent, in order, after updating `state` and `lastError`. The
+    /// `challenge` isn't published: the client consumes it.
     @ObservationIgnored public var onMessage: (@MainActor (AgentMessage) -> Void)?
 
     private let endpoint: NWEndpoint
@@ -57,28 +57,28 @@ public final class LevelDeckClient {
     private let clock: any Clock<Duration>
     private let handshakeTimeout: Duration
     @ObservationIgnored private var connection: MessageConnection<AgentMessage, ClientMessage>?
-    /// Conexión TCP corta que resuelve un endpoint Bonjour a host y puerto.
+    /// Short-lived TCP connection that resolves a Bonjour endpoint to host and port.
     @ObservationIgnored private var resolver: NWConnection?
-    /// Identifica la conexión vigente para descartar eventos de una anterior ya cancelada.
+    /// Identifies the current connection, to discard events from an earlier, cancelled one.
     @ObservationIgnored private var connectionID: UUID?
-    /// Fallos seguidos desde el último `connected`.
+    /// Consecutive failures since the last `connected`.
     @ObservationIgnored private var failures = 0
     @ObservationIgnored private var retryTask: Task<Void, Never>?
     @ObservationIgnored private var handshakeTask: Task<Void, Never>?
 
-    /// Intentos de conexión hechos desde `connect()` (para los tests del backoff).
+    /// Connection attempts made since `connect()` (for the backoff tests).
     @ObservationIgnored private(set) var attempts = 0
-    /// Espera programada antes del próximo intento, si hay uno programado.
+    /// Scheduled wait before the next attempt, if one is scheduled.
     @ObservationIgnored private(set) var scheduledRetryDelay: Duration?
-    /// Solo para tests: arma el `hello` a partir del `nonce` (p. ej. para declarar el
-    /// `deviceId` de otro); `nil` no manda nada.
+    /// Tests only: builds the `hello` from the `nonce` (e.g. to declare another device's
+    /// `deviceId`); `nil` sends nothing.
     @ObservationIgnored var helloForTests: ((Data) -> ClientMessage?)?
 
     /// - Parameters:
-    ///   - deviceID: identidad PSK que la Mac asignó al emparejar; va en el `hello` (SPEC §7).
-    ///     `nil` solo con el transporte en claro de desarrollo.
-    ///   - reconnect: política de reconexión; `nil` no reintenta.
-    ///   - clock: reloj del backoff y del timeout del handshake.
+    ///   - deviceID: PSK identity the Mac assigned when pairing; goes in `hello` (SPEC §7).
+    ///     `nil` only with the development plaintext transport.
+    ///   - reconnect: reconnection policy; `nil` doesn't retry.
+    ///   - clock: clock for the backoff and the handshake timeout.
     public init(
         endpoint: NWEndpoint, security: TransportSecurity, deviceName: String, deviceID: String? = nil,
         reconnect: ReconnectPolicy? = nil, clock: any Clock<Duration> = ContinuousClock(),
@@ -94,7 +94,7 @@ public final class LevelDeckClient {
         self.handshakeTimeout = handshakeTimeout
     }
 
-    /// Solo para tests: permite anunciar otra versión en el `hello`.
+    /// Tests only: allows advertising a different version in `hello`.
     init(
         endpoint: NWEndpoint, security: TransportSecurity, deviceName: String, deviceID: String?,
         helloVersion: Int, reconnect: ReconnectPolicy? = nil, clock: any Clock<Duration> = ContinuousClock()
@@ -109,7 +109,7 @@ public final class LevelDeckClient {
         self.handshakeTimeout = Self.defaultHandshakeTimeout
     }
 
-    /// Conecta desde cero: olvida los fallos anteriores.
+    /// Connects from scratch: forgets previous failures.
     public func connect() {
         cancelRetry()
         failures = 0
@@ -118,15 +118,15 @@ public final class LevelDeckClient {
         startAttempt()
     }
 
-    /// Conecta ya, sin esperar el backoff (p. ej. al volver la app al frente). No hace nada
-    /// si ya está conectado o hay un intento en curso.
+    /// Connects now, without waiting for the backoff (e.g. when the app returns to the foreground).
+    /// Does nothing if already connected or an attempt is in progress.
     public func reconnectNow() {
         if status == .connected || connection != nil || resolver != nil {
             return
         }
         cancelRetry()
         failures = 0
-        // Mientras reintenta, la interfaz sigue mostrando "Reconectando…".
+        // While retrying, the UI keeps showing "Reconnecting…".
         if case .reconnecting = status {} else {
             status = .connecting
         }
@@ -139,19 +139,19 @@ public final class LevelDeckClient {
         status = .idle
     }
 
-    /// Devuelve `false` si no hay conexión o si el mensaje no se puede codificar.
+    /// Returns `false` if there's no connection or the message can't be encoded.
     @discardableResult
     public func send(_ message: ClientMessage) -> Bool {
         connection?.send(message) ?? false
     }
 
-    /// Envía un frame crudo. Solo para tests de mensajes inválidos.
+    /// Sends a raw frame. Only for invalid-message tests.
     func sendRaw(_ data: Data) {
         connection?.sendData(data)
     }
 
-    /// Resuelve y abre una conexión. El WebSocket del cliente necesita un endpoint URL: un
-    /// servicio Bonjour se resuelve primero a host y puerto; un `hostPort` se convierte directo.
+    /// Resolves and opens a connection. The client's WebSocket needs a URL endpoint: a
+    /// Bonjour service is first resolved to host and port; a `hostPort` is converted directly.
     private func startAttempt() {
         cancelConnection()
         let id = UUID()
@@ -182,10 +182,10 @@ public final class LevelDeckClient {
         scheduledRetryDelay = nil
     }
 
-    // MARK: - Fallos y reintentos
+    // MARK: - Failures and retries
 
-    /// La conexión vigente terminó (o no se pudo abrir). Reintenta si hay política y el
-    /// problema no es definitivo; si no, queda en `.disconnected`.
+    /// The current connection ended (or couldn't be opened). Retries if there's a policy and
+    /// the problem isn't permanent; otherwise, stays in `.disconnected`.
     private func connectionEnded(_ issue: NetworkIssue?) {
         cancelConnection()
         guard let reconnect, !isFinal(issue) else {
@@ -211,7 +211,7 @@ public final class LevelDeckClient {
         }
     }
 
-    /// El agente rechazó a este dispositivo o la Mac no reconoce su clave: reintentar no sirve.
+    /// The agent rejected this device or the Mac doesn't recognize its key: retrying won't help.
     private func isFinal(_ issue: NetworkIssue?) -> Bool {
         if let code = lastError?.code, code == .notPaired || code == .unsupportedVersion {
             return true
@@ -219,8 +219,8 @@ public final class LevelDeckClient {
         return issue?.kind == .handshakeFailed
     }
 
-    /// Con la conexión abierta, el `challenge` y el `state` tienen que llegar a tiempo; si no,
-    /// el agente no responde (p. ej. habla otra versión del protocolo).
+    /// With the connection open, the `challenge` and the `state` must arrive in time; otherwise,
+    /// the agent isn't responding (e.g. it speaks another protocol version).
     private func startHandshakeTimer(id: UUID) {
         let clock = clock
         let timeout = handshakeTimeout
@@ -252,7 +252,7 @@ public final class LevelDeckClient {
 
     private func resolve(_ service: NWEndpoint, id: UUID) {
         let parameters = NWParameters.tcp
-        // IPv4 evita armar URLs con direcciones IPv6 link-local y su zona (`%en0`).
+        // IPv4 avoids building URLs with link-local IPv6 addresses and their zone (`%en0`).
         if let ip = parameters.defaultProtocolStack.internetProtocol as? NWProtocolIP.Options {
             ip.version = .v4
         }
@@ -285,8 +285,8 @@ public final class LevelDeckClient {
         }
     }
 
-    /// `ws://host:port/` (o `wss://` si `secure`) para un endpoint `hostPort`; un endpoint URL
-    /// se usa tal cual.
+    /// `ws://host:port/` (or `wss://` if `secure`) for a `hostPort` endpoint; a URL endpoint
+    /// is used as-is.
     static func webSocketURL(for endpoint: NWEndpoint, secure: Bool = false) -> URL? {
         switch endpoint {
         case let .url(url):
@@ -297,7 +297,7 @@ public final class LevelDeckClient {
             case let .ipv4(address):
                 hostText = address.rawValue.map(String.init).joined(separator: ".")
             case let .ipv6(address):
-                // Literal entre corchetes; la zona (`%en0`) va escapada como `%25` (RFC 6874).
+                // Bracketed literal; the zone (`%en0`) is escaped as `%25` (RFC 6874).
                 hostText = "[\("\(address)".replacingOccurrences(of: "%", with: "%25"))]"
             case let .name(name, _):
                 hostText = name
@@ -314,14 +314,14 @@ public final class LevelDeckClient {
         guard id == connectionID else { return }
         switch event {
         case .ready:
-            // El `hello` sale cuando llega el `challenge` del agente (SPEC §8).
+            // The `hello` goes out when the agent's `challenge` arrives (SPEC §8).
             startHandshakeTimer(id: id)
         case let .waiting(issue):
             waiting(issue)
         case let .closed(issue):
             connectionEnded(issue)
         case .message(.failure):
-            // Un mensaje del agente que no entendemos no rompe la sesión.
+            // A message from the agent we don't understand doesn't break the session.
             break
         case let .message(.success(.challenge(nonce))):
             let hello: ClientMessage?
@@ -352,9 +352,9 @@ public final class LevelDeckClient {
         }
     }
 
-    /// La conexión no avanza (sin red, agente sin escuchar, permiso de red local). Sin
-    /// política de reconexión queda esperando, como hace Network.framework; con política
-    /// cuenta como un intento fallido y entra al backoff.
+    /// The connection isn't progressing (no network, agent not listening, local network
+    /// permission). Without a reconnection policy it keeps waiting, as Network.framework does;
+    /// with a policy it counts as a failed attempt and enters the backoff.
     private func waiting(_ issue: NetworkIssue) {
         if reconnect == nil {
             status = .waiting(issue)
@@ -363,7 +363,7 @@ public final class LevelDeckClient {
         }
     }
 
-    /// HMAC del `nonce` con la clave propia (`HelloProof`). En claro no hay clave.
+    /// HMAC of the `nonce` with our own key (`HelloProof`). In plaintext there's no key.
     private func proof(for nonce: Data) -> Data? {
         guard let deviceID else { return nil }
         switch security {

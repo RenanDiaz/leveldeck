@@ -1,18 +1,18 @@
 import Foundation
 @preconcurrency import Network
 
-/// Conexión WebSocket que envía y recibe mensajes del protocolo como frames de texto.
+/// WebSocket connection that sends and receives protocol messages as text frames.
 ///
-/// Todo corre en el main actor: Network entrega los callbacks en la cola principal.
+/// Everything runs on the main actor: Network delivers callbacks on the main queue.
 @MainActor
 final class MessageConnection<Incoming: Decodable, Outgoing: Encodable> {
     enum Event {
         case ready
-        /// La conexión no puede avanzar todavía (p. ej. sin permiso de red local).
+        /// The connection can't make progress yet (e.g. no local network permission).
         case waiting(NetworkIssue)
-        /// Un frame recibido; `failure` si no se pudo decodificar.
+        /// A received frame; `failure` if it couldn't be decoded.
         case message(Result<Incoming, any Error>)
-        /// Fin de la conexión. Se emite una sola vez.
+        /// End of the connection. Emitted only once.
         case closed(NetworkIssue?)
     }
 
@@ -33,15 +33,15 @@ final class MessageConnection<Incoming: Decodable, Outgoing: Encodable> {
         receiveNext()
     }
 
-    /// Codifica y envía un mensaje. Devuelve `false` si la conexión está cerrada o si
-    /// `LevelDeckKit` se niega a codificarlo (p. ej. un volumen fuera de rango).
+    /// Encodes and sends a message. Returns `false` if the connection is closed or if
+    /// `LevelDeckKit` refuses to encode it (e.g. a volume out of range).
     @discardableResult
     func send(_ message: Outgoing, then completion: (@MainActor @Sendable () -> Void)? = nil) -> Bool {
         guard let data = try? ProtocolCoder.encode(message) else { return false }
         return sendData(data, then: completion)
     }
 
-    /// Envía un frame de texto tal cual. Los tests lo usan para mandar mensajes inválidos.
+    /// Sends a text frame as-is. Tests use it to send invalid messages.
     @discardableResult
     func sendData(_ data: Data, then completion: (@MainActor @Sendable () -> Void)? = nil) -> Bool {
         guard !isClosed else { return false }
@@ -101,7 +101,7 @@ final class MessageConnection<Incoming: Decodable, Outgoing: Encodable> {
         } else if isClose || isFinal {
             close(nil)
         }
-        // `onEvent` puede haber cerrado la conexión.
+        // `onEvent` may have closed the connection.
         if !isClosed {
             receiveNext()
         }
@@ -110,7 +110,7 @@ final class MessageConnection<Incoming: Decodable, Outgoing: Encodable> {
     private func close(_ error: NWError?) {
         guard !isClosed else { return }
         isClosed = true
-        // La ruta se lee antes de cancelar: explica por qué se cayó (p. ej. red local denegada).
+        // The path is read before cancelling: it explains why it dropped (e.g. local network denied).
         let issue = error.map { NetworkIssue($0, path: connection.currentPath) }
         connection.cancel()
         onEvent(.closed(issue))
