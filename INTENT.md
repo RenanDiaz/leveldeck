@@ -1,51 +1,51 @@
 # INTENT — LevelDeck
 
-> Control remoto del audio de la Mac desde el iPhone
+> Remote control for the Mac's audio from the iPhone
 
-## Por qué existe
+## Why it exists
 
-Quiero controlar el audio de mi Mac desde el iPhone con la misma naturalidad con la que Logic Remote controla una sesión de Logic, pero aplicado al audio del sistema y no a un DAW.
+I want to control my Mac's audio from my iPhone as naturally as Logic Remote controls a Logic session, but applied to system audio instead of a DAW.
 
-Hoy, para ajustar el volumen tengo que estar frente a la Mac: usar el teclado, la barra de menú o los ajustes. Quiero que el iPhone funcione como una superficie de control física: tomarlo, mover un fader y listo.
+Today, to adjust the volume I have to be in front of the Mac: using the keyboard, the menu bar or settings. I want the iPhone to work like a physical control surface: pick it up, move a fader, done.
 
-## Qué significa que funcione
+## What "it works" means
 
-- Abro la app en el iPhone y, sin configurar nada, encuentra mi Mac y ya puedo controlarla.
-- Muevo un fader y el volumen cambia al instante, sin retraso perceptible.
-- Si el volumen cambia desde la Mac (teclado, otra app), el iPhone lo refleja. Los dos lados cuentan siempre la misma verdad.
-- Se siente como un instrumento, no como un formulario: gestos directos, respuesta inmediata y feedback claro.
-- Solo mis dispositivos pueden controlar mi Mac.
+- I open the app on the iPhone and, without configuring anything, it finds my Mac and I can control it right away.
+- I move a fader and the volume changes instantly, with no perceptible lag.
+- If the volume changes on the Mac (keyboard, another app), the iPhone reflects it. Both sides always tell the same truth.
+- It feels like an instrument, not a form: direct gestures, immediate response and clear feedback.
+- Only my devices can control my Mac.
 
-## Qué quiero poder controlar
+## What I want to control
 
-En orden de importancia (1 y 2 tienen la misma prioridad):
+In order of importance (1 and 2 have the same priority):
 
-1. Volumen general de salida y mute.
-2. Volumen de entrada (micrófono o interfaz) y mute.
-3. Elegir el dispositivo de salida y de entrada activos.
-4. Volumen por aplicación. Es deseable, pero sé que macOS no lo ofrece de forma nativa. Quiero entender el costo antes de comprometerme con esto.
+1. Main output volume and mute.
+2. Input volume (microphone or interface) and mute.
+3. Choosing the active output and input devices.
+4. Per-app volume. It's desirable, but I know macOS doesn't offer it natively. I want to understand the cost before committing to it.
 
-## Principios
+## Principles
 
-- **Nativo de Apple.** Swift y SwiftUI en ambos lados, con frameworks del sistema. Nada de capas web ni runtimes extra.
-- **Local primero.** Todo ocurre en la red local, sin servidores externos, cuentas ni nube.
-- **Invisible en la Mac.** El agente vive discreto en la barra de menú, arranca solo y no estorba.
-- **Simple antes que completo.** Prefiero una app que haga pocas cosas y las haga perfectas a una que haga muchas a medias.
+- **Apple-native.** Swift and SwiftUI on both sides, with system frameworks. No web layers or extra runtimes.
+- **Local first.** Everything happens on the local network, with no external servers, accounts or cloud.
+- **Invisible on the Mac.** The agent lives quietly in the menu bar, starts on its own and stays out of the way.
+- **Simple before complete.** I'd rather have an app that does a few things perfectly than one that does many things halfway.
 
-## Fuera de alcance (por ahora)
+## Out of scope (for now)
 
-- Publicarla en la App Store. Es un proyecto personal, para mis dispositivos.
-- Control fuera de la red local.
-- Controlar DAWs, reproducción multimedia u otras funciones de la Mac que no sean audio.
-- Soporte para Windows, Android u otras plataformas.
+- Publishing it on the App Store. It's a personal project, for my devices.
+- Control outside the local network.
+- Controlling DAWs, media playback or other Mac functions that aren't audio.
+- Support for Windows, Android or other platforms.
 
-## Preguntas abiertas
+## Open questions
 
-- ¿Vale la pena el volumen por aplicación, dado que requiere un driver de audio virtual?
-- ¿Cómo se emparejan el iPhone y la Mac la primera vez de forma segura y sin fricción?
-- ¿Tiene sentido controlar el volumen también desde un widget o desde el Centro de Control del iPhone, sin abrir la app?
-- ¿Cómo debería verse la interfaz: un mixer con varios faders o un control único grande?
+- Is per-app volume worth it, given that it requires a virtual audio driver?
+- How do the iPhone and the Mac pair the first time, securely and without friction?
+- Does it make sense to also control the volume from a widget or from the iPhone's Control Center, without opening the app?
+- What should the interface look like: a mixer with several faders or a single large control?
 
-## Cómo se va a construir
+## How it will be built
 
-Con Claude Code u otro agente de código, partiendo de este documento. El spec técnico se deriva de aquí. Si el spec y este intent se contradicen, este documento manda hasta que se actualice.
+With Claude Code or another coding agent, starting from this document. The technical spec is derived from here. If the spec and this intent contradict each other, this document takes precedence until it's updated.
