@@ -1,25 +1,38 @@
 # CLAUDE.md
 
-## Documentos
+## Language
 
-- `INTENT.md` manda sobre `SPEC.md`, y `SPEC.md` manda sobre el código y el `README.md`.
-- `README.md` explica cómo compilar, instalar, usar y verificar. No copia el spec: enlaza a sus secciones.
+English is the project's development language. Write in English:
 
-## Al cerrar una fase (o cambiar el spec)
+- documentation (`INTENT.md`, `SPEC.md`, `README.md`, this file);
+- code: identifiers, comments and doc comments;
+- scripts and CI: comments and output messages;
+- commit messages, branch names, PR titles and descriptions, and PR checklists.
 
-Revisa `README.md` y actualiza lo que haya cambiado:
+Spanish only appears as a UI translation, in the String Catalogs (`*.xcstrings`); English is also the source and fallback language there ([`SPEC.md` §3](SPEC.md#3-platforms-and-requirements)).
 
-- la sección **Estado** (fases completas y lo que queda para después de v1);
-- **Requisitos** (versiones de macOS, iOS, Xcode y Swift);
-- **Primeros pasos** y **Emparejar**, si cambió el flujo de instalación o de emparejamiento;
-- **Verificación**, si `scripts/verify.sh` o CI hacen algo nuevo;
-- **Estructura**, si se agregaron o movieron carpetas o paquetes;
-- **Cómo funciona, en corto**, si cambió el transporte, la versión del protocolo o el almacenamiento de claves;
-- los enlaces a secciones del spec (`SPEC.md#…`), si se renumeraron o renombraron.
+Some older code comments and scripts are still in Spanish. When you touch a file, translate the comments you change; don't open a PR just to translate.
 
-Si no hay nada que cambiar, dilo en el PR.
+## Documents
 
-## Proyecto y verificación
+- `INTENT.md` takes precedence over `SPEC.md`, and `SPEC.md` takes precedence over the code and `README.md`.
+- `README.md` explains how to build, install, use and verify. It doesn't copy the spec: it links to its sections.
 
-- El `.xcodeproj` no se versiona: se genera con `xcodegen generate` desde `project.yml`.
-- Antes de hacer push, corre `scripts/verify.sh` (es lo mismo que corre CI en `macos-15`).
+## When closing a phase (or changing the spec)
+
+Review `README.md` and update whatever changed:
+
+- the **Status** section (completed phases and what's left for after v1);
+- **Requirements** (macOS, iOS, Xcode and Swift versions);
+- **Getting started** and **Pairing**, if the installation or pairing flow changed;
+- **Verification**, if `scripts/verify.sh` or CI do something new;
+- **Structure**, if folders or packages were added or moved;
+- **How it works, in short**, if the transport, the protocol version or the key storage changed;
+- the links to spec sections (`SPEC.md#…`), if sections were renumbered or renamed.
+
+If nothing needs to change, say so in the PR.
+
+## Project and verification
+
+- The `.xcodeproj` is not versioned: it's generated with `xcodegen generate` from `project.yml`.
+- Before pushing, run `scripts/verify.sh` (it's the same thing CI runs on `macos-15`).

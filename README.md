@@ -1,118 +1,118 @@
 # LevelDeck
 
-Control remoto del audio de la Mac desde el iPhone. Un agente en la barra de menú de la Mac expone el volumen y el mute de salida y entrada por la red local, y la app del iPhone los muestra como un mixer con faders sincronizados en tiempo real.
+Remote control for the Mac's audio from the iPhone. An agent in the Mac's menu bar exposes output and input volume and mute over the local network, and the iPhone app shows them as a mixer with faders synced in real time.
 
-Swift y SwiftUI en ambos lados, solo frameworks del sistema. Sin servidores, cuentas, nube ni dependencias de terceros.
+Swift and SwiftUI on both sides, system frameworks only. No servers, accounts, cloud or third-party dependencies.
 
-> **Documentos del proyecto.** El porqué está en [`INTENT.md`](INTENT.md) y el cómo en [`SPEC.md`](SPEC.md). Este README solo explica cómo compilar, instalar y usar. Si algo de aquí contradice el spec, manda el spec; si el spec contradice el intent, manda el intent.
+> **Project documents.** The why is in [`INTENT.md`](INTENT.md) and the how in [`SPEC.md`](SPEC.md). This README only explains how to build, install and use. If anything here contradicts the spec, the spec wins; if the spec contradicts the intent, the intent wins.
 
-## Qué hace
+## What it does
 
-- **Descubrimiento sin configuración.** El iPhone encuentra la Mac por Bonjour (`_leveldeck._tcp`) y se conecta solo a las que ya están emparejadas.
-- **Salida y entrada.** Volumen y mute de ambos, con selector del dispositivo activo (audífonos, interfaces USB, monitores, dispositivos virtuales).
-- **Sincronización en ambos sentidos.** Si el volumen cambia desde el teclado de la Mac o desde otro iPhone, todos los clientes lo reflejan. El fader que estás arrastrando no salta por el eco.
-- **Controles no configurables.** Si un dispositivo no permite cambiar el volumen o el mute (p. ej. HDMI), ese control se deshabilita sin afectar al otro.
-- **Solo tus dispositivos.** Emparejamiento por QR y TLS-PSK con una clave por iPhone; revocar desde la Mac corta la conexión al instante.
-- **Resistente.** Reconecta sola tras dormir la Mac, cambiar de red o volver la app al frente. El agente arranca al iniciar sesión.
-- **Inglés y español** en ambas apps.
+- **Zero-configuration discovery.** The iPhone finds the Mac over Bonjour (`_leveldeck._tcp`) and connects on its own to the ones it's already paired with.
+- **Output and input.** Volume and mute for both, with a picker for the active device (headphones, USB interfaces, monitors, virtual devices).
+- **Two-way sync.** If the volume changes from the Mac's keyboard or from another iPhone, every client reflects it. The fader you're dragging doesn't jump from the echo.
+- **Non-settable controls.** If a device doesn't allow changing the volume or the mute (e.g. HDMI), that control is disabled without affecting the other one.
+- **Only your devices.** Pairing via QR and TLS-PSK with one key per iPhone; revoking from the Mac cuts the connection instantly.
+- **Resilient.** Reconnects on its own after the Mac sleeps, the network changes or the app returns to the foreground. The agent starts at login.
+- **English and Spanish** in both apps.
 
-## Estado
+## Status
 
-v1 completa en sus fases 0–5 (ver [`SPEC.md` §9](SPEC.md#9-fases)). El volumen por aplicación y los widgets del Centro de Control quedan para después de v1 (§10).
+v1 complete through phases 0–5 (see [`SPEC.md` §9](SPEC.md#9-phases)). Per-app volume and Control Center widgets are left for after v1 (§10).
 
-## Requisitos
+## Requirements
 
-| | Versión |
+| | Version |
 |---|---|
-| Mac para compilar | macOS con Xcode 16+ (Swift 6) |
-| Agente | macOS 14+ |
+| Build Mac | macOS with Xcode 16+ (Swift 6) |
+| Agent | macOS 14+ |
 | App | iOS 17+ (iPhone) |
-| Herramientas | [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`) |
+| Tools | [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`) |
 
-El proyecto de Xcode **no se versiona**: se genera desde [`project.yml`](project.yml).
+The Xcode project is **not versioned**: it's generated from [`project.yml`](project.yml).
 
-## Primeros pasos
+## Getting started
 
 ```bash
-# 1. Team ID de firma (archivo local, fuera de git)
+# 1. Signing Team ID (local file, outside git)
 cp Configs/Local.xcconfig.example Configs/Local.xcconfig
-#    edita DEVELOPMENT_TEAM con tu Team ID
+#    edit DEVELOPMENT_TEAM with your Team ID
 
-# 2. Generar el proyecto
+# 2. Generate the project
 xcodegen generate
 
-# 3. Abrir en Xcode
+# 3. Open in Xcode
 open LevelDeck.xcodeproj
 ```
 
-Vuelve a correr `xcodegen generate` cada vez que agregues o quites archivos, o cambies `project.yml`.
+Run `xcodegen generate` again whenever you add or remove files, or change `project.yml`.
 
-En Xcode:
+In Xcode:
 
-1. Esquema **LevelDeckAgent** → *My Mac* → Run. Aparece el ícono en la barra de menú (no en el Dock).
-2. Esquema **LevelDeck** → tu iPhone → Run. La primera vez, iOS pide permiso de red local: acéptalo. En macOS 15+ la Mac también lo pide.
+1. **LevelDeckAgent** scheme → *My Mac* → Run. The icon shows up in the menu bar (not in the Dock).
+2. **LevelDeck** scheme → your iPhone → Run. The first time, iOS asks for local network permission: accept it. On macOS 15+ the Mac asks too.
 
-### Emparejar
+### Pairing
 
-1. En el menú del agente: **Emparejar nuevo dispositivo…** Se abre una ventana con un QR que vence en 2 minutos.
-2. En el iPhone, la Mac aparece en la lista: toca **Emparejar** y escanea el QR.
-3. Listo. De ahí en adelante el iPhone se conecta solo, sin volver a escanear.
+1. In the agent's menu: **Pair New Device…** A window opens with a QR code that expires in 2 minutes.
+2. On the iPhone, the Mac shows up in the list: tap **Pair** and scan the QR code.
+3. Done. From then on the iPhone connects on its own, without scanning again.
 
-En el simulador no hay cámara: en builds Debug la ventana del QR muestra el código como texto para pegarlo.
+The simulator has no camera: in Debug builds the QR window shows the code as text so you can paste it.
 
-Para revocar un iPhone, hazlo desde la lista de dispositivos del menú del agente. "Olvidar" en los ajustes del iPhone solo borra la clave del iPhone; la Mac lo sigue listando hasta que lo revoques.
+To revoke an iPhone, do it from the device list in the agent's menu. **Forget** in the iPhone's settings only deletes the iPhone's key; the Mac keeps listing it until you revoke it.
 
-## Verificación
+## Verification
 
 ```bash
 scripts/verify.sh
 ```
 
-Corre lo mismo que CI (GitHub Actions sobre `macos-15`, en cada push a `main` y `claude/**` y en cada PR):
+Runs the same thing as CI (GitHub Actions on `macos-15`, on every push to `main` and `claude/**` and on every PR):
 
 1. `xcodegen generate`
-2. Tests de `LevelDeckKit` (protocolo, emparejamiento, sync e integración en loopback con TLS-PSK)
-3. Tests de `LevelDeckAgentKit` (lógica de audio con un mock de CoreAudio)
-4. Build de ambas apps en Debug y Release, sin firma
-5. Chequeo de que el transporte en claro de desarrollo no existe en las apps Release
-6. [`scripts/check-localizations.py`](scripts/check-localizations.py): todo texto de las apps tiene traducción al español
+2. `LevelDeckKit` tests (protocol, pairing, sync and loopback integration with TLS-PSK)
+3. `LevelDeckAgentKit` tests (audio logic with a CoreAudio mock)
+4. Build of both apps in Debug and Release, unsigned
+5. Check that the development plaintext transport doesn't exist in the Release apps
+6. [`scripts/check-localizations.py`](scripts/check-localizations.py): every string in the apps has a Spanish translation
 
-Para iterar sobre un paquete sin generar el proyecto:
+To iterate on a package without generating the project:
 
 ```bash
 swift test --package-path Packages/LevelDeckKit
 swift test --package-path Packages/LevelDeckAgentKit
 ```
 
-CoreAudio real, la cámara, Bonjour en un iPhone físico y el login item no se pueden probar en CI: cada fase tiene un checklist manual en su PR, basado en los criterios de "Listo cuando" del spec.
+Real CoreAudio, the camera, Bonjour on a physical iPhone and the login item can't be tested in CI: each phase has a manual checklist in its PR, based on the spec's "Done when" criteria.
 
-## Estructura
+## Structure
 
 ```
 leveldeck/
-├── INTENT.md, SPEC.md       # qué y por qué / cómo
-├── project.yml              # XcodeGen: fuente de verdad del proyecto
-├── Configs/                 # xcconfig compartido; Local.xcconfig (Team ID) fuera de git
-├── LevelDeckAgent/          # app macOS de barra de menú
-├── LevelDeck/               # app iOS
+├── INTENT.md, SPEC.md       # what and why / how
+├── project.yml              # XcodeGen: source of truth for the project
+├── Configs/                 # shared xcconfig; Local.xcconfig (Team ID) outside git
+├── LevelDeckAgent/          # macOS menu bar app
+├── LevelDeck/               # iOS app
 ├── Packages/
-│   ├── LevelDeckKit/        # compartido: Protocol, Transport, Sync, Pairing
-│   └── LevelDeckAgentKit/   # solo macOS: AgentAudio (lógica) y AgentCoreAudio (CoreAudio)
-├── Design/AppIcon/          # arte fuente del ícono (no lo usa el build)
-└── scripts/                 # verify.sh y check-localizations.py
+│   ├── LevelDeckKit/        # shared: Protocol, Transport, Sync, Pairing
+│   └── LevelDeckAgentKit/   # macOS only: AgentAudio (logic) and AgentCoreAudio (CoreAudio)
+├── Design/AppIcon/          # icon source art (not used by the build)
+└── scripts/                 # verify.sh and check-localizations.py
 ```
 
-La lógica vive en los paquetes, donde se prueba de forma aislada; las apps son sobre todo vistas. Detalle en [`SPEC.md` §4](SPEC.md#4-estructura-del-repositorio).
+The logic lives in the packages, where it's tested in isolation; the apps are mostly views. Details in [`SPEC.md` §4](SPEC.md#4-repository-structure).
 
-## Cómo funciona, en corto
+## How it works, in short
 
-- **Transporte.** WebSocket sobre TLS 1.2 con pre-shared key (`TLS_PSK_WITH_AES_128_GCM_SHA256`), con Network.framework. No hay canal sin cifrar: el emparejamiento también ocurre sobre TLS-PSK con la clave del QR.
-- **Identidad.** Cada iPhone tiene su propia clave e identidad. Al conectar, la Mac manda un `nonce` y el `hello` responde con su HMAC, así que ningún dispositivo puede presentarse como otro.
-- **Protocolo.** JSON, versión 3. El agente siempre manda el snapshot completo del estado (sin diffs), agrupado a un máximo de 30 por segundo. Ver [`SPEC.md` §8](SPEC.md#8-protocolo).
-- **Claves.** En el Keychain de ambos lados: el del iPhone no migra con respaldos; la Mac usa el llavero de login.
+- **Transport.** WebSocket over TLS 1.2 with a pre-shared key (`TLS_PSK_WITH_AES_128_GCM_SHA256`), using Network.framework. There's no unencrypted channel: pairing also happens over TLS-PSK with the key from the QR code.
+- **Identity.** Each iPhone has its own key and identity. On connect, the Mac sends a `nonce` and the `hello` answers with its HMAC, so no device can pass itself off as another.
+- **Protocol.** JSON, version 3. The agent always sends the full state snapshot (no diffs), coalesced to at most 30 per second. See [`SPEC.md` §8](SPEC.md#8-protocol).
+- **Keys.** In the Keychain on both sides: the iPhone's doesn't migrate with backups; the Mac uses the login keychain.
 
-Limitaciones de seguridad conocidas y aceptadas (sin forward secrecy, QR reutilizable dentro de su ventana de 2 minutos) en [`SPEC.md` §7.2 y §10](SPEC.md#10-después-de-v1).
+Known and accepted security limitations (no forward secrecy, QR code reusable within its 2-minute window) in [`SPEC.md` §7.2 and §10](SPEC.md#10-after-v1).
 
-## Distribución
+## Distribution
 
-Proyecto personal, fuera de la App Store. Se instala desde Xcode en tus propios dispositivos. Con Apple ID gratuito la firma de iOS caduca a los 7 días; con cuenta de desarrollador de pago se puede usar TestFlight o firma de un año. El agente se firma localmente y no necesita notarización para uso propio.
+Personal project, outside the App Store. It's installed from Xcode on your own devices. With a free Apple ID, iOS signing expires after 7 days; with a paid developer account you can use TestFlight or one-year signing. The agent is signed locally and doesn't need notarization for personal use.
