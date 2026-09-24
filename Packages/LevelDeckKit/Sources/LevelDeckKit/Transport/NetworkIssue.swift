@@ -20,6 +20,9 @@ public struct NetworkIssue: Equatable, Sendable {
         /// El handshake TLS falló: la Mac no reconoce la identidad o la clave de este
         /// dispositivo (no está emparejado o se revocó).
         case handshakeFailed
+        /// La conexión se abrió pero el agente no completó el `challenge` → `state` a tiempo
+        /// (p. ej. habla otra versión del protocolo o se colgó).
+        case noResponse
         case other
     }
 

@@ -29,7 +29,8 @@ enum TestKeys {
 @MainActor
 func connect(
     to server: LevelDeckServer, security: TransportSecurity, name: String = "Test",
-    deviceID: String? = nil, helloVersion: Int = ProtocolVersion.current
+    deviceID: String? = nil, helloVersion: Int = ProtocolVersion.current,
+    hello: ((Data) -> ClientMessage?)? = nil
 ) async throws -> (LevelDeckClient, MessageRecorder) {
     try await waitUntil("el listener queda listo") { server.port != nil }
     let port = try #require(server.port.flatMap(NWEndpoint.Port.init(rawValue:)))
@@ -37,6 +38,7 @@ func connect(
         endpoint: .hostPort(host: "127.0.0.1", port: port),
         security: security, deviceName: name, deviceID: deviceID, helloVersion: helloVersion
     )
+    client.helloForTests = hello
     let recorder = MessageRecorder()
     client.onMessage = { recorder.record($0) }
     recorder.describeContext = { [weak client] in

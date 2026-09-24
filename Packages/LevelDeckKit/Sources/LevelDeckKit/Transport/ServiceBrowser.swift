@@ -3,6 +3,9 @@ import Foundation
 import Observation
 
 /// Descubre agentes en la red local por Bonjour (`_leveldeck._tcp`), sin configurar IP.
+///
+/// Si el browser falla (p. ej. al apagar el Wi-Fi), se reintenta con `Backoff`;
+/// `restartIfNeeded()` lo reintenta ya (al volver la app al frente).
 @MainActor
 @Observable
 public final class ServiceBrowser {
@@ -26,6 +29,9 @@ public final class ServiceBrowser {
     public private(set) var status: Status = .idle
 
     @ObservationIgnored private var browser: NWBrowser?
+    @ObservationIgnored private var failures = 0
+    @ObservationIgnored private var retryTask: Task<Void, Never>?
+    private let backoff = Backoff()
 
     public init() {}
 
@@ -48,7 +54,27 @@ public final class ServiceBrowser {
         browser.start(queue: .main)
     }
 
+    /// Si el browser falló o quedó esperando la red, lo recrea ahora. No toca uno que funciona.
+    public func restartIfNeeded() {
+        switch status {
+        case .idle, .browsing:
+            // Detenido a propósito, o funcionando.
+            return
+        case .waiting, .failed:
+            break
+        }
+        retryTask?.cancel()
+        retryTask = nil
+        failures = 0
+        browser?.cancel()
+        browser = nil
+        start()
+    }
+
     public func stop() {
+        retryTask?.cancel()
+        retryTask = nil
+        failures = 0
         browser?.cancel()
         browser = nil
         agents = []
@@ -58,15 +84,35 @@ public final class ServiceBrowser {
     private func stateChanged(_ state: NWBrowser.State) {
         switch state {
         case .ready:
+            failures = 0
             status = .browsing
         case let .waiting(error):
             status = .waiting(NetworkIssue(error))
         case let .failed(error):
+            browser?.stateUpdateHandler = nil
+            browser?.browseResultsChangedHandler = nil
             browser?.cancel()
             browser = nil
             status = .failed(NetworkIssue(error))
+            scheduleRetry()
         default:
             break
+        }
+    }
+
+    private func scheduleRetry() {
+        failures += 1
+        let delay = backoff.delay(afterFailures: failures)
+        retryTask?.cancel()
+        retryTask = Task { [weak self] in
+            do {
+                try await Task.sleep(for: delay)
+            } catch {
+                return
+            }
+            guard let self, self.browser == nil, self.retryTask != nil else { return }
+            self.retryTask = nil
+            self.start()
         }
     }
 

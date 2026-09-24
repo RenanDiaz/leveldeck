@@ -2,9 +2,24 @@ import Foundation
 @preconcurrency import Network
 import Observation
 
-/// Cliente del agente: conecta, hace el `hello` y publica los mensajes que llegan.
+/// Cómo reintenta el cliente cuando la conexión se pierde (SPEC §6.2).
+public struct ReconnectPolicy: Equatable, Sendable {
+    public var backoff: Backoff
+
+    public init(backoff: Backoff = Backoff()) {
+        self.backoff = backoff
+    }
+}
+
+/// Cliente del agente: conecta, responde el `challenge` con el `hello` y publica los mensajes
+/// que llegan.
 ///
-/// No reintenta solo: la reconexión con backoff es de la Fase 5.
+/// Con `reconnect`, si la conexión se pierde o no se puede abrir, reintenta solo con
+/// `Backoff` (1 s, 2 s, 4 s… máximo 10 s) y muestra `.reconnecting`. No reintenta cuando el
+/// agente rechazó a este dispositivo (`notPaired`, `unsupportedVersion`) ni cuando falla el
+/// handshake TLS (la Mac no reconoce la clave): esos quedan en `.disconnected`.
+/// `reconnectNow()` salta la espera (p. ej. al volver la app al frente). El reloj se inyecta
+/// para probar los intervalos sin esperar de verdad.
 @MainActor
 @Observable
 public final class LevelDeckClient {
@@ -15,15 +30,22 @@ public final class LevelDeckClient {
         case waiting(NetworkIssue)
         /// Llegó el primer `state` tras el `hello`.
         case connected
+        /// Se perdió la conexión (o no se pudo abrir) y se está reintentando. `attempt` cuenta
+        /// los fallos seguidos; `issue` es el último problema, si hubo uno.
+        case reconnecting(attempt: Int, issue: NetworkIssue?)
         /// `nil` si se desconectó sin error (p. ej. el agente cerró la sesión).
         case disconnected(NetworkIssue?)
     }
+
+    /// Cuánto espera, con la conexión abierta, a que el `challenge` y el `state` lleguen.
+    public nonisolated static let defaultHandshakeTimeout: Duration = .seconds(5)
 
     public private(set) var status: Status = .idle
     public private(set) var state: StateSnapshot?
     public private(set) var lastError: AgentError?
 
-    /// Cada mensaje del agente, en orden, después de actualizar `state` y `lastError`.
+    /// Cada mensaje del agente, en orden, después de actualizar `state` y `lastError`. El
+    /// `challenge` no se publica: lo consume el cliente.
     @ObservationIgnored public var onMessage: (@MainActor (AgentMessage) -> Void)?
 
     private let endpoint: NWEndpoint
@@ -31,52 +53,88 @@ public final class LevelDeckClient {
     private let deviceName: String
     private let deviceID: String?
     private let helloVersion: Int
+    private let reconnect: ReconnectPolicy?
+    private let clock: any Clock<Duration>
+    private let handshakeTimeout: Duration
     @ObservationIgnored private var connection: MessageConnection<AgentMessage, ClientMessage>?
     /// Conexión TCP corta que resuelve un endpoint Bonjour a host y puerto.
     @ObservationIgnored private var resolver: NWConnection?
     /// Identifica la conexión vigente para descartar eventos de una anterior ya cancelada.
     @ObservationIgnored private var connectionID: UUID?
+    /// Fallos seguidos desde el último `connected`.
+    @ObservationIgnored private var failures = 0
+    @ObservationIgnored private var retryTask: Task<Void, Never>?
+    @ObservationIgnored private var handshakeTask: Task<Void, Never>?
 
-    /// - Parameter deviceID: identidad PSK que la Mac asignó al emparejar; va en el `hello`
-    ///   (SPEC §7). `nil` solo con el transporte en claro de desarrollo.
-    public init(endpoint: NWEndpoint, security: TransportSecurity, deviceName: String, deviceID: String? = nil) {
+    /// Intentos de conexión hechos desde `connect()` (para los tests del backoff).
+    @ObservationIgnored private(set) var attempts = 0
+    /// Espera programada antes del próximo intento, si hay uno programado.
+    @ObservationIgnored private(set) var scheduledRetryDelay: Duration?
+    /// Solo para tests: arma el `hello` a partir del `nonce` (p. ej. para declarar el
+    /// `deviceId` de otro); `nil` no manda nada.
+    @ObservationIgnored var helloForTests: ((Data) -> ClientMessage?)?
+
+    /// - Parameters:
+    ///   - deviceID: identidad PSK que la Mac asignó al emparejar; va en el `hello` (SPEC §7).
+    ///     `nil` solo con el transporte en claro de desarrollo.
+    ///   - reconnect: política de reconexión; `nil` no reintenta.
+    ///   - clock: reloj del backoff y del timeout del handshake.
+    public init(
+        endpoint: NWEndpoint, security: TransportSecurity, deviceName: String, deviceID: String? = nil,
+        reconnect: ReconnectPolicy? = nil, clock: any Clock<Duration> = ContinuousClock(),
+        handshakeTimeout: Duration = LevelDeckClient.defaultHandshakeTimeout
+    ) {
         self.endpoint = endpoint
         self.security = security
         self.deviceName = deviceName
         self.deviceID = deviceID
         self.helloVersion = ProtocolVersion.current
+        self.reconnect = reconnect
+        self.clock = clock
+        self.handshakeTimeout = handshakeTimeout
     }
 
     /// Solo para tests: permite anunciar otra versión en el `hello`.
     init(
         endpoint: NWEndpoint, security: TransportSecurity, deviceName: String, deviceID: String?,
-        helloVersion: Int
+        helloVersion: Int, reconnect: ReconnectPolicy? = nil, clock: any Clock<Duration> = ContinuousClock()
     ) {
         self.endpoint = endpoint
         self.security = security
         self.deviceName = deviceName
         self.deviceID = deviceID
         self.helloVersion = helloVersion
+        self.reconnect = reconnect
+        self.clock = clock
+        self.handshakeTimeout = Self.defaultHandshakeTimeout
     }
 
-    /// El WebSocket del cliente necesita un endpoint URL (`ws://host:port/`, `wss://` con TLS): con `hostPort` o
-    /// con un servicio Bonjour aborta la conexión antes del upgrade (NWError 53). Un servicio se
-    /// resuelve primero a host y puerto; un `hostPort` se convierte directamente.
+    /// Conecta desde cero: olvida los fallos anteriores.
     public func connect() {
-        cancelConnection()
-        let id = UUID()
-        connectionID = id
-        lastError = nil
+        cancelRetry()
+        failures = 0
+        attempts = 0
         status = .connecting
-        switch endpoint {
-        case .service:
-            resolve(endpoint, id: id)
-        default:
-            open(endpoint, id: id)
+        startAttempt()
+    }
+
+    /// Conecta ya, sin esperar el backoff (p. ej. al volver la app al frente). No hace nada
+    /// si ya está conectado o hay un intento en curso.
+    public func reconnectNow() {
+        if status == .connected || connection != nil || resolver != nil {
+            return
         }
+        cancelRetry()
+        failures = 0
+        // Mientras reintenta, la interfaz sigue mostrando "Reconectando…".
+        if case .reconnecting = status {} else {
+            status = .connecting
+        }
+        startAttempt()
     }
 
     public func disconnect() {
+        cancelRetry()
         cancelConnection()
         status = .idle
     }
@@ -92,17 +150,95 @@ public final class LevelDeckClient {
         connection?.sendData(data)
     }
 
+    /// Resuelve y abre una conexión. El WebSocket del cliente necesita un endpoint URL: un
+    /// servicio Bonjour se resuelve primero a host y puerto; un `hostPort` se convierte directo.
+    private func startAttempt() {
+        cancelConnection()
+        let id = UUID()
+        connectionID = id
+        lastError = nil
+        attempts += 1
+        switch endpoint {
+        case .service:
+            resolve(endpoint, id: id)
+        default:
+            open(endpoint, id: id)
+        }
+    }
+
     private func cancelConnection() {
         connectionID = nil
+        handshakeTask?.cancel()
+        handshakeTask = nil
         resolver?.cancel()
         resolver = nil
         connection?.cancel()
         connection = nil
     }
 
+    private func cancelRetry() {
+        retryTask?.cancel()
+        retryTask = nil
+        scheduledRetryDelay = nil
+    }
+
+    // MARK: - Fallos y reintentos
+
+    /// La conexión vigente terminó (o no se pudo abrir). Reintenta si hay política y el
+    /// problema no es definitivo; si no, queda en `.disconnected`.
+    private func connectionEnded(_ issue: NetworkIssue?) {
+        cancelConnection()
+        guard let reconnect, !isFinal(issue) else {
+            status = .disconnected(issue)
+            return
+        }
+        failures += 1
+        status = .reconnecting(attempt: failures, issue: issue)
+        let delay = reconnect.backoff.delay(afterFailures: failures)
+        scheduledRetryDelay = delay
+        let clock = clock
+        retryTask?.cancel()
+        retryTask = Task { [weak self] in
+            do {
+                try await clock.sleep(for: delay)
+            } catch {
+                return
+            }
+            guard let self, !Task.isCancelled else { return }
+            self.retryTask = nil
+            self.scheduledRetryDelay = nil
+            self.startAttempt()
+        }
+    }
+
+    /// El agente rechazó a este dispositivo o la Mac no reconoce su clave: reintentar no sirve.
+    private func isFinal(_ issue: NetworkIssue?) -> Bool {
+        if let code = lastError?.code, code == .notPaired || code == .unsupportedVersion {
+            return true
+        }
+        return issue?.kind == .handshakeFailed
+    }
+
+    /// Con la conexión abierta, el `challenge` y el `state` tienen que llegar a tiempo; si no,
+    /// el agente no responde (p. ej. habla otra versión del protocolo).
+    private func startHandshakeTimer(id: UUID) {
+        let clock = clock
+        let timeout = handshakeTimeout
+        handshakeTask?.cancel()
+        handshakeTask = Task { [weak self] in
+            do {
+                try await clock.sleep(for: timeout)
+            } catch {
+                return
+            }
+            guard let self, id == self.connectionID, self.status != .connected else { return }
+            self.connectionEnded(NetworkIssue(.noResponse, detail: "Sin challenge/state en \(timeout)"))
+        }
+    }
+
     private func open(_ target: NWEndpoint, id: UUID) {
         guard let url = Self.webSocketURL(for: target, secure: security.usesTLS) else {
-            status = .disconnected(NetworkIssue(.other, detail: "Endpoint sin URL de WebSocket: \(target)"))
+            connectionEnded(NetworkIssue(.other, detail: "Endpoint sin URL de WebSocket: \(target)"))
             return
         }
         let connection = MessageConnection<AgentMessage, ClientMessage>(
@@ -138,16 +274,12 @@ public final class LevelDeckClient {
             if let remote {
                 open(remote, id: id)
             } else {
-                status = .disconnected(NetworkIssue(.unresolved, detail: "Sin remoteEndpoint tras resolver"))
+                connectionEnded(NetworkIssue(.unresolved, detail: "Sin remoteEndpoint tras resolver"))
             }
         case let .waiting(error):
-            status = .waiting(NetworkIssue(error, path: resolver.currentPath))
+            waiting(NetworkIssue(error, path: resolver.currentPath))
         case let .failed(error):
-            let issue = NetworkIssue(error, path: resolver.currentPath)
-            resolver.cancel()
-            self.resolver = nil
-            connectionID = nil
-            status = .disconnected(issue)
+            connectionEnded(NetworkIssue(error, path: resolver.currentPath))
         default:
             break
         }
@@ -182,25 +314,65 @@ public final class LevelDeckClient {
         guard id == connectionID else { return }
         switch event {
         case .ready:
-            connection?.send(.hello(deviceName: deviceName, version: helloVersion, deviceId: deviceID))
+            // El `hello` sale cuando llega el `challenge` del agente (SPEC §8).
+            startHandshakeTimer(id: id)
         case let .waiting(issue):
-            status = .waiting(issue)
+            waiting(issue)
         case let .closed(issue):
-            connection = nil
-            connectionID = nil
-            status = .disconnected(issue)
+            connectionEnded(issue)
         case .message(.failure):
             // Un mensaje del agente que no entendemos no rompe la sesión.
             break
+        case let .message(.success(.challenge(nonce))):
+            let hello: ClientMessage?
+            if let helloForTests {
+                hello = helloForTests(nonce)
+            } else {
+                hello = .hello(deviceName: deviceName, version: helloVersion, deviceId: deviceID, proof: proof(for: nonce))
+            }
+            if let hello {
+                connection?.send(hello)
+            }
         case let .message(.success(message)):
             switch message {
             case let .state(snapshot, _):
                 state = snapshot
-                status = .connected
+                if status != .connected {
+                    status = .connected
+                    failures = 0
+                    handshakeTask?.cancel()
+                    handshakeTask = nil
+                }
             case let .error(code, text):
                 lastError = AgentError(code, text)
+            case .challenge:
+                break
             }
             onMessage?(message)
+        }
+    }
+
+    /// La conexión no avanza (sin red, agente sin escuchar, permiso de red local). Sin
+    /// política de reconexión queda esperando, como hace Network.framework; con política
+    /// cuenta como un intento fallido y entra al backoff.
+    private func waiting(_ issue: NetworkIssue) {
+        if reconnect == nil {
+            status = .waiting(issue)
+        } else {
+            connectionEnded(issue)
+        }
+    }
+
+    /// HMAC del `nonce` con la clave propia (`HelloProof`). En claro no hay clave.
+    private func proof(for nonce: Data) -> Data? {
+        guard let deviceID else { return nil }
+        switch security {
+        #if LEVELDECK_INSECURE_TRANSPORT
+        case .insecurePlaintext:
+            return nil
+        #endif
+        case let .tlsPSK(keys):
+            return keys[deviceID].map { HelloProof.sign(nonce: nonce, deviceId: deviceID, key: $0) }
         }
     }
 }

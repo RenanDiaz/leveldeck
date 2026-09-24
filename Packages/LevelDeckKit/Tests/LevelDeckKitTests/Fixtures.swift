@@ -7,7 +7,7 @@ enum Fixtures {
     static let stateJSON = Data("""
     {
       "type": "state",
-      "v": 2,
+      "v": 3,
       "output": { "deviceId": "BuiltInSpeakerDevice", "deviceName": "MacBook Pro Speakers",
                   "volume": 0.62, "muted": false, "volumeSettable": true, "muteSettable": true },
       "input":  { "deviceId": "BuiltInMicrophoneDevice", "deviceName": "MacBook Pro Microphone",

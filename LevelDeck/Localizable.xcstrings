@@ -511,6 +511,16 @@
         }
       }
     },
+    "Reconnecting…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconectando…"
+          }
+        }
+      }
+    },
     "Settings": {
       "localizations": {
         "es": {
@@ -557,6 +567,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "La Mac no reconoció la clave de este iPhone. Vuelve a emparejarlo desde el menú de la Mac."
+          }
+        }
+      }
+    },
+    "The Mac didn't respond. Make sure LevelDeck and LevelDeck Agent are up to date.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La Mac no respondió. Verifica que LevelDeck y LevelDeck Agent estén actualizados."
           }
         }
       }

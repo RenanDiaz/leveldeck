@@ -26,6 +26,8 @@ public protocol LevelDeckServerDelegate: AnyObject {
 @MainActor
 public protocol LevelDeckServerAuthorizer: AnyObject {
     /// `deviceId` es la identidad que el cliente declaró en el `hello` (`nil` si no mandó).
+    /// Con TLS-PSK, el servidor ya verificó la `proof` del `hello` contra la clave de ese
+    /// `deviceId`: el cliente demostró ser ese dispositivo.
     /// Si devuelve `false`, el servidor responde `notPaired` y cierra.
     func authorize(deviceId: String?, deviceName: String) -> Bool
 }
@@ -39,8 +41,14 @@ public protocol LevelDeckServerAuthorizer: AnyObject {
 ///   dispositivo revocado.
 /// - Si hay `authorizer`, cada `hello` pasa por él; sin `authorizer` se acepta cualquiera.
 ///
-/// - Handshake: el primer mensaje debe ser `hello`. Si la versión no coincide se responde
-///   `unsupportedVersion` y se cierra; cualquier otro mensaje antes de `hello` cierra la conexión.
+/// - Handshake: al abrirse la sesión el servidor manda `challenge` con un `nonce` nuevo. El
+///   primer mensaje del cliente debe ser `hello`. Si la versión no coincide se responde
+///   `unsupportedVersion` y se cierra. Con TLS-PSK, la `proof` del `hello` tiene que ser el
+///   HMAC del `nonce` con la clave del `deviceId` declarado, según el conjunto de claves
+///   vigente; si no, `notPaired` y se cierra (SPEC §8). Cualquier otro mensaje antes de
+///   `hello` cierra la conexión, y una sesión sin `hello` válido en `helloTimeout` también.
+/// - Si el listener falla (p. ej. se cayó la red), se reintenta con `Backoff`.
+///   `restartListener()` lo recrea a pedido (al despertar la Mac o al cambiar de red).
 /// - Un frame que no se puede decodificar (tipo desconocido, campo faltante, volumen fuera
 ///   de rango) se responde con `invalidValue` y la conexión sigue abierta.
 /// - Los `state` se agrupan a un máximo de 30 por segundo y no se reenvían si el snapshot
@@ -81,7 +89,13 @@ public final class LevelDeckServer {
     private let serviceName: String?
     private let agentID: String?
     private let requiredInterfaceType: NWInterface.InterfaceType?
+    private let helloTimeout: Duration
+    private let fixedPort: NWEndpoint.Port?
+    private let backoff = Backoff()
     @ObservationIgnored private var listener: NWListener?
+    /// Fallos seguidos del listener, para el backoff del reintento.
+    @ObservationIgnored private var listenerFailures = 0
+    @ObservationIgnored private var listenerRetry: Task<Void, Never>?
     @ObservationIgnored private var sessions: [UUID: Session] = [:]
     @ObservationIgnored private var broadcaster: ThrottledSender<StateSnapshot>?
     /// Últimos eventos de conexión, para diagnosticar fallos en tests.
@@ -92,13 +106,20 @@ public final class LevelDeckServer {
     ///   - serviceName: nombre Bonjour; `nil` usa el nombre de la Mac.
     ///   - agentID: `agentId` de la Mac; se anuncia en el registro TXT (SPEC §7).
     ///   - requiredInterfaceType: limita el listener a una interfaz (p. ej. `.loopback`).
+    ///   - helloTimeout: cuánto espera un `hello` válido antes de cerrar la sesión.
+    ///   - port: puerto fijo; `nil` (lo normal) usa uno dinámico. Los tests de reconexión
+    ///     lo fijan para que el cliente encuentre al servidor en el mismo lugar.
     public init(
         security: TransportSecurity,
         advertise: Bool = true,
         serviceName: String? = nil,
         agentID: String? = nil,
-        requiredInterfaceType: NWInterface.InterfaceType? = nil
+        requiredInterfaceType: NWInterface.InterfaceType? = nil,
+        helloTimeout: Duration = .seconds(10),
+        port: NWEndpoint.Port? = nil
     ) {
+        self.helloTimeout = helloTimeout
+        self.fixedPort = port
         self.security = security
         self.advertise = advertise
         self.serviceName = serviceName
@@ -118,9 +139,26 @@ public final class LevelDeckServer {
     /// listener se reinicia con el nuevo; las sesiones activas no se tocan.
     public func update(security: TransportSecurity) {
         self.security = security
-        guard let old = listener else { return }
-        detach(old)
-        old.cancel()
+        guard listener != nil else { return }
+        replaceListener()
+    }
+
+    /// Recrea el listener y vuelve a anunciarse por Bonjour, sin tocar las sesiones activas.
+    /// Se usa al despertar la Mac o al cambiar de red. También reintenta ya si el listener
+    /// había fallado. No hace nada si el servicio está detenido.
+    public func restartListener() {
+        guard listener != nil || listenerRetry != nil else { return }
+        listenerFailures = 0
+        replaceListener()
+    }
+
+    private func replaceListener() {
+        listenerRetry?.cancel()
+        listenerRetry = nil
+        if let old = listener {
+            detach(old)
+            old.cancel()
+        }
         listener = nil
         advertisedName = nil
         startListener()
@@ -147,7 +185,12 @@ public final class LevelDeckServer {
         }
         let listener: NWListener
         do {
-            listener = try NWListener(using: parameters)
+            if let fixedPort {
+                parameters.allowLocalEndpointReuse = true
+                listener = try NWListener(using: parameters, on: fixedPort)
+            } else {
+                listener = try NWListener(using: parameters)
+            }
         } catch let error as NWError {
             status = .failed(NetworkIssue(error))
             return
@@ -176,12 +219,16 @@ public final class LevelDeckServer {
     }
 
     public func stop() {
+        listenerRetry?.cancel()
+        listenerRetry = nil
+        listenerFailures = 0
         if let listener {
             detach(listener)
             listener.cancel()
         }
         listener = nil
         for session in sessions.values {
+            session.helloTimer?.cancel()
             session.connection.cancel()
         }
         sessions.removeAll()
@@ -208,18 +255,40 @@ public final class LevelDeckServer {
     private func listenerStateChanged(_ state: NWListener.State) {
         switch state {
         case .ready:
+            listenerFailures = 0
             if let port = listener?.port?.rawValue {
                 status = .ready(port: port)
             }
         case let .waiting(error):
             status = .waiting(NetworkIssue(error))
         case let .failed(error):
-            listener?.cancel()
+            if let listener {
+                detach(listener)
+                listener.cancel()
+            }
             listener = nil
             status = .failed(NetworkIssue(error))
+            scheduleListenerRetry()
         default:
             // `.cancelled` solo llega después de `stop()` o de un fallo, que ya fijaron el estado.
             break
+        }
+    }
+
+    /// Reintenta levantar el listener tras un fallo, con `Backoff`.
+    private func scheduleListenerRetry() {
+        listenerFailures += 1
+        let delay = backoff.delay(afterFailures: listenerFailures)
+        listenerRetry?.cancel()
+        listenerRetry = Task { [weak self] in
+            do {
+                try await Task.sleep(for: delay)
+            } catch {
+                return
+            }
+            guard let self, self.listener == nil, self.listenerRetry != nil else { return }
+            self.listenerRetry = nil
+            self.startListener()
         }
     }
 
@@ -245,7 +314,19 @@ public final class LevelDeckServer {
             [weak self] event in
             self?.handle(event, from: id)
         }
-        sessions[id] = Session(id: id, connection: connection)
+        let session = Session(id: id, connection: connection)
+        sessions[id] = session
+        let timeout = helloTimeout
+        session.helloTimer = Task { [weak self, weak session] in
+            do {
+                try await Task.sleep(for: timeout)
+            } catch {
+                return
+            }
+            guard let session, session.deviceName == nil else { return }
+            self?.connectionEvents.append("helloTimeout")
+            session.connection.cancel()
+        }
         connection.start()
     }
 
@@ -253,9 +334,15 @@ public final class LevelDeckServer {
         guard let session = sessions[id] else { return }
         log(event)
         switch event {
-        case .ready, .waiting:
+        case .ready:
+            // El `nonce` de esta sesión; el `hello` tiene que firmarlo (SPEC §8).
+            let nonce = HelloProof.makeNonce()
+            session.nonce = nonce
+            session.connection.send(.challenge(nonce: nonce))
+        case .waiting:
             break
         case .closed:
+            session.helloTimer?.cancel()
             sessions[id] = nil
             updateClients()
         case let .message(.failure(error)):
@@ -266,7 +353,7 @@ public final class LevelDeckServer {
     }
 
     private func handle(_ message: ClientMessage, in session: Session) {
-        if case let .hello(deviceName, version, deviceId) = message {
+        if case let .hello(deviceName, version, deviceId, proof) = message {
             guard version == ProtocolVersion.current else {
                 let text = "Versión \(version) no soportada; el agente habla la v\(ProtocolVersion.current)."
                 session.connection.send(.error(code: .unsupportedVersion, message: text)) {
@@ -275,14 +362,20 @@ public final class LevelDeckServer {
                 }
                 return
             }
-            if let authorizer, !authorizer.authorize(deviceId: deviceId, deviceName: deviceName) {
-                connectionEvents.append("notPaired(\(deviceId ?? "sin deviceId"))")
+            // El `nonce` es de un solo uso: un segundo `hello` en la misma sesión no pasa.
+            let nonce = session.nonce
+            session.nonce = nil
+            let proven = proves(deviceId: deviceId, proof: proof, nonce: nonce)
+            if !proven || !(authorizer?.authorize(deviceId: deviceId, deviceName: deviceName) ?? true) {
+                connectionEvents.append("notPaired(\(deviceId ?? "sin deviceId"), prueba=\(proven))")
                 session.connection.send(.error(code: .notPaired, message: "Dispositivo no emparejado.")) {
                     [weak session] in
                     session?.connection.cancel()
                 }
                 return
             }
+            session.helloTimer?.cancel()
+            session.helloTimer = nil
             session.deviceName = deviceName
             session.deviceId = deviceId
             updateClients()
@@ -301,6 +394,21 @@ public final class LevelDeckServer {
         }
         // El dedup del broadcaster evita un `state` repetido si el comando no cambió nada.
         stateDidChange()
+    }
+
+    /// `true` si la `proof` demuestra que el cliente tiene la clave del `deviceId` que declara,
+    /// según el conjunto de claves vigente: un dispositivo revocado o un QR vencido ya no
+    /// están ahí. En claro (solo desarrollo) no hay claves y no se exige.
+    private func proves(deviceId: String?, proof: Data?, nonce: Data?) -> Bool {
+        switch security {
+        #if LEVELDECK_INSECURE_TRANSPORT
+        case .insecurePlaintext:
+            return true
+        #endif
+        case let .tlsPSK(keys):
+            guard let deviceId, let proof, let nonce, let key = keys[deviceId] else { return false }
+            return HelloProof.verify(proof, nonce: nonce, deviceId: deviceId, key: key)
+        }
     }
 
     private func log(_ event: MessageConnection<ClientMessage, AgentMessage>.Event) {
@@ -354,6 +462,10 @@ private final class Session {
     var deviceName: String?
     /// Identidad declarada en el `hello`, si el cliente la mandó.
     var deviceId: String?
+    /// `nonce` del `challenge`, hasta que llega el `hello`.
+    var nonce: Data?
+    /// Cierra la sesión si no llega un `hello` válido a tiempo.
+    var helloTimer: Task<Void, Never>?
 
     init(id: UUID, connection: MessageConnection<ClientMessage, AgentMessage>) {
         self.id = id

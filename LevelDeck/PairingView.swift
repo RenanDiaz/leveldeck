@@ -254,7 +254,7 @@ final class PairingFlow {
                     phase = .failed(.rejected(issue))
                 }
                 return
-            case .idle, .connecting, .waiting:
+            case .idle, .connecting, .waiting, .reconnecting:
                 if ContinuousClock.now >= deadline {
                     client.disconnect()
                     self.client = nil

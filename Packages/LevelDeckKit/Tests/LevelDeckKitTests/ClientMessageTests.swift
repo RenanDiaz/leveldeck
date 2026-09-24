@@ -7,6 +7,7 @@ struct ClientMessageTests {
     static let allMessages: [ClientMessage] = [
         .hello(deviceName: "iPhone de Renan"),
         .hello(deviceName: "iPhone", deviceId: "8E0B2C1A-0000-4000-8000-000000000001"),
+        .hello(deviceName: "iPhone", deviceId: "dev-1", proof: Data(repeating: 7, count: 32)),
         .setVolume(scope: .output, value: 0.5),
         .setVolume(scope: .input, value: 0),
         .setVolume(scope: .output, value: 1),
@@ -35,10 +36,27 @@ struct ClientMessageTests {
         #expect(paired["deviceId"] as? String == "dev-1")
     }
 
+    @Test func helloCarriesProofAsBase64URL() throws {
+        let proof = Data([0xFB, 0xFF, 0x00, 0x3E])
+        let object = try Fixtures.object(ProtocolCoder.encode(
+            ClientMessage.hello(deviceName: "iPhone", deviceId: "dev-1", proof: proof)
+        ))
+        #expect(object["proof"] as? String == "-_8APg")
+        let bare = try Fixtures.object(ProtocolCoder.encode(ClientMessage.hello(deviceName: "iPhone")))
+        #expect(bare["proof"] == nil)
+    }
+
+    @Test func rejectsHelloWithMalformedProof() {
+        let json = Data(#"{"type":"hello","v":3,"deviceName":"iPhone","deviceId":"d","proof":"no es base64!"}"#.utf8)
+        #expect(throws: DecodingError.self) {
+            try ProtocolCoder.decode(ClientMessage.self, from: json)
+        }
+    }
+
     @Test func decodesHelloWithoutDeviceId() throws {
         // Un `hello` de la Fase 2 (sin deviceId) sigue siendo válido; el authorizer decide.
         let json = Data(#"{"type":"hello","v":2,"deviceName":"iPhone"}"#.utf8)
-        #expect(try ProtocolCoder.decode(ClientMessage.self, from: json) == .hello(deviceName: "iPhone", deviceId: nil))
+        #expect(try ProtocolCoder.decode(ClientMessage.self, from: json) == .hello(deviceName: "iPhone", version: 2, deviceId: nil))
     }
 
     @Test func commandsHaveFlatPayloadWithoutVersion() throws {

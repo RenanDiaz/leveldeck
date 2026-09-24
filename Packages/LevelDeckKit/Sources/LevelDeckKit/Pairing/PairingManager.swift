@@ -148,7 +148,8 @@ public final class PairingManager: LevelDeckServerAuthorizer {
 
     // MARK: - LevelDeckServerAuthorizer
 
-    /// Un cliente que pasó el handshake declara su `deviceId` en el `hello`. Si es un
+    /// Un cliente que pasó el handshake manda su `deviceId` en el `hello`, y el servidor ya
+    /// verificó con la `proof` que tiene la clave de ese `deviceId` (SPEC §8). Si es un
     /// dispositivo emparejado, se actualiza su nombre; si es el pendiente y el QR no venció,
     /// se registra; cualquier otro se rechaza.
     public func authorize(deviceId: String?, deviceName: String) -> Bool {

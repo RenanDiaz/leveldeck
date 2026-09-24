@@ -6,7 +6,7 @@ import Testing
 struct AgentMessageTests {
     @Test func decodesSpecExample() throws {
         let message = try ProtocolCoder.decode(AgentMessage.self, from: Fixtures.stateJSON)
-        #expect(message == .state(Fixtures.snapshot, version: 2))
+        #expect(message == .state(Fixtures.snapshot, version: 3))
     }
 
     @Test func stateRoundTrip() throws {
@@ -103,6 +103,30 @@ struct AgentMessageTests {
          "output":{"deviceId":"a","deviceName":"b","volume":0.5,"muted":false,
                    "settable":true,"muteSettable":true}}
         """.utf8)
+        #expect(throws: DecodingError.self) {
+            try ProtocolCoder.decode(AgentMessage.self, from: json)
+        }
+    }
+
+    // MARK: - challenge (v3)
+
+    @Test func challengeRoundTrip() throws {
+        let message = AgentMessage.challenge(nonce: HelloProof.makeNonce())
+        let data = try ProtocolCoder.encode(message)
+        #expect(try ProtocolCoder.decode(AgentMessage.self, from: data) == message)
+    }
+
+    @Test func challengeHasFlatPayloadWithoutVersion() throws {
+        let nonce = Data(repeating: 0xAB, count: HelloProof.nonceByteCount)
+        let object = try Fixtures.object(ProtocolCoder.encode(AgentMessage.challenge(nonce: nonce)))
+        #expect(Set(object.keys) == ["type", "nonce"])
+        #expect(object["type"] as? String == "challenge")
+        #expect(object["nonce"] as? String == nonce.base64URLEncodedString())
+    }
+
+    @Test("Rechaza nonce inválido", arguments: ["", "no-es-base64!", "AAAA"])
+    func rejectsInvalidNonce(nonce: String) {
+        let json = Data(#"{"type":"challenge","nonce":"\#(nonce)"}"#.utf8)
         #expect(throws: DecodingError.self) {
             try ProtocolCoder.decode(AgentMessage.self, from: json)
         }

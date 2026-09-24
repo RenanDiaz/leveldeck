@@ -7,6 +7,9 @@ import Observation
 /// por segundo y siempre el valor final al soltar; mientras se arrastra, y ~300 ms después,
 /// los `state` entrantes no mueven su volumen (`MixerState`). Si otro cliente o la Mac cambian
 /// el dispositivo a mitad del arrastre, ese arrastre deja de enviar.
+///
+/// Feedback háptico ligero al llegar a 0 % o 100 % arrastrando y al tocar el mute: solo por
+/// acciones propias, no por lo que llega de otro cliente o de la Mac (SPEC §6.2).
 @MainActor
 @Observable
 final class MixerModel {
@@ -20,12 +23,17 @@ final class MixerModel {
     /// resincronizó con el agente, así que no queda nada que el usuario tenga que resolver.
     private(set) var notice: AgentError?
 
+    /// Cambia con cada evento háptico; la vista lo usa como disparador de `sensoryFeedback`.
+    private(set) var hapticTick = 0
+
     /// La Mac revocó este iPhone (`error` `notPaired`, SPEC §7): la clave ya no sirve.
     @ObservationIgnored var onUnpaired: (@MainActor () -> Void)?
 
     @ObservationIgnored private var senders: [Scope: ThrottledSender<Float>] = [:]
     @ObservationIgnored private var settleTasks: [Scope: Task<Void, Never>] = [:]
     @ObservationIgnored private var noticeTask: Task<Void, Never>?
+    /// Último valor del arrastre en curso, para detectar la llegada a un borde.
+    @ObservationIgnored private var lastDragValue: [Scope: Float] = [:]
 
     init(agentName: String, client: LevelDeckClient) {
         self.agentName = agentName
@@ -60,12 +68,24 @@ final class MixerModel {
         client.disconnect()
     }
 
+    /// La app pasó a segundo plano: se cierra la conexión y se pausan los reintentos. iOS
+    /// suspende la app y el socket moriría igual; así la Mac ve el cierre al instante.
+    func suspend() {
+        client.disconnect()
+    }
+
+    /// La app volvió al frente: reconexión inmediata, sin esperar el backoff.
+    func resume() {
+        client.reconnectNow()
+    }
+
     // MARK: - Fader
 
     func dragBegan(_ scope: Scope) {
         settleTasks[scope]?.cancel()
         mixer.beginDrag(scope)
         senders[scope]?.forgetLastValue()
+        lastDragValue[scope] = mixer[scope]?.volume
     }
 
     func dragChanged(_ scope: Scope, to value: Float) {
@@ -73,6 +93,10 @@ final class MixerModel {
         guard mixer.acceptsDrag(scope) else { return }
         mixer.drag(scope, to: value)
         senders[scope]?.submit(value)
+        if let previous = lastDragValue[scope], FaderBoundary.reached(from: previous, to: value) != nil {
+            hapticTick += 1
+        }
+        lastDragValue[scope] = value
     }
 
     func dragEnded(_ scope: Scope, at value: Float) {
@@ -94,6 +118,7 @@ final class MixerModel {
         let muted = !channel.muted
         mixer.setMuted(muted, scope: scope)
         client.send(.setMute(scope: scope, muted: muted))
+        hapticTick += 1
     }
 
     // MARK: - Dispositivo
@@ -124,6 +149,9 @@ final class MixerModel {
             }
             mixer.apply(snapshot, now: now)
             cancelInvalidatedDrags()
+        case .challenge:
+            // El cliente lo consume y no lo publica; no llega aquí.
+            break
         case .error(.notPaired, _):
             onUnpaired?()
         case let .error(code, message):

@@ -14,6 +14,7 @@ struct DiscoveryView: View {
     @State private var isShowingSettings = false
     @State private var unpairedAgentName: String?
     @AppStorage("lastAgentID") private var lastAgentID = ""
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         NavigationStack {
@@ -89,6 +90,19 @@ struct DiscoveryView: View {
         }
         .onAppear { browser.start() }
         .onChange(of: browser.agents) { autoConnectIfPossible() }
+        .onChange(of: scenePhase) { _, phase in
+            // En segundo plano se cierra la conexión; al volver, se reconecta de inmediato
+            // sin esperar el backoff (SPEC §6.2).
+            switch phase {
+            case .background:
+                mixer?.suspend()
+            case .active:
+                browser.restartIfNeeded()
+                mixer?.resume()
+            default:
+                break
+            }
+        }
     }
 
     @ViewBuilder
@@ -162,7 +176,8 @@ struct DiscoveryView: View {
         mixer?.disconnect()
         let client = LevelDeckClient(
             endpoint: agent.endpoint, security: AppTransport.security(for: paired),
-            deviceName: UIDevice.current.name, deviceID: paired.deviceID
+            deviceName: UIDevice.current.name, deviceID: paired.deviceID,
+            reconnect: ReconnectPolicy()
         )
         let model = MixerModel(agentName: agent.name, client: client)
         model.onUnpaired = {
