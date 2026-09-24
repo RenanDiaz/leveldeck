@@ -56,7 +56,7 @@ struct ClientMessageTests {
     @Test func decodesHelloWithoutDeviceId() throws {
         // Un `hello` de la Fase 2 (sin deviceId) sigue siendo válido; el authorizer decide.
         let json = Data(#"{"type":"hello","v":2,"deviceName":"iPhone"}"#.utf8)
-        #expect(try ProtocolCoder.decode(ClientMessage.self, from: json) == .hello(deviceName: "iPhone", deviceId: nil))
+        #expect(try ProtocolCoder.decode(ClientMessage.self, from: json) == .hello(deviceName: "iPhone", version: 2, deviceId: nil))
     }
 
     @Test func commandsHaveFlatPayloadWithoutVersion() throws {
