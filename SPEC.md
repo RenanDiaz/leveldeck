@@ -1,7 +1,7 @@
 # SPEC — LevelDeck
 
 > Derived from `INTENT.md`. If anything here contradicts the intent, the intent wins.
-> Status: **Part I (v1)** — v1.7.1, implemented through Phase 5 (reconnection, haptics, login item and challenge-response for the `hello`; includes the two-step Mac Keychain read from v1.6.1; v1.7.1 is the English translation, no content changes). **Part II (v2)** — 2.1 (§13–§22): per-device strips, protocol v4, universal app, design audit and per-app volume spike. The intent's v2 section is approved and the §21 decisions are resolved; 2.1 folds them in. **Part III (v3)** — 3.0-draft (§23–§28): Sidecar control, spike only; derived from the v3 intent, which is a draft and not in force.
+> Status: **Part I (v1)** — v1.7.1, implemented through Phase 5 (reconnection, haptics, login item and challenge-response for the `hello`; includes the two-step Mac Keychain read from v1.6.1; v1.7.1 is the English translation, no content changes). **Part II (v2)** — 2.1 (§13–§22): per-device strips, protocol v4, universal app, design audit and per-app volume spike. The intent's v2 section is approved and the §21 decisions are resolved; 2.1 folds them in. **Part III (v3)** — 3.1 (§23–§28): Sidecar control; the v3 intent is approved and the four §28 decisions are resolved; spike first, implementation only if it's a "go".
 
 ## 1. Summary
 
@@ -850,15 +850,15 @@ Complements §11. Everything automated runs in `scripts/verify.sh` and CI; whate
 
 ---
 
-# Part III — v3 (draft)
+# Part III — v3
 
-> Derived from the "v3" section of `INTENT.md`, which is a **draft** and not in force. Status: **3.0-draft**. This part only fixes the Sidecar spike (Phase 12) and the shape an implementation would take, so the spike measures what matters. Nothing here is built until the v3 intent is approved and the spike ends in a "go". Parts I and II remain the reference for everything else.
+> Derived from the "v3" section of `INTENT.md` (approved). Status: **3.1**. Draft 3.0 listed four open decisions in §28 with a recommended option each; all four were decided (the recommended option in every case) and 3.1 records them. This part fixes the Sidecar spike (Phase 12) and the shape of the implementation (Phase 13), which is only built if the spike ends in a "go". Parts I and II remain the reference for everything else.
 
 ## 23. v3 summary
 
 One conditional capability: **connecting and disconnecting Sidecar** (the iPad as a display for the Mac) from the iPhone and the iPad.
 
-- There's no public API. The only clean route is the private `SidecarCore` framework, which the v3 intent allows as a **fenced exception** to "system frameworks, nothing private" (§20.3 still excludes `TCCAccessPreflight`; the exception covers `SidecarCore` only).
+- There's no public API. The only clean route is the private `SidecarCore` framework, which the v3 intent allows as a **fenced exception** (decision E1) to "system frameworks, nothing private" (§20.3 still excludes `TCCAccessPreflight`; the exception covers `SidecarCore` only).
 - First a throwaway spike with a go/no-go (Phase 12, §25). Only if it's a "go" is there an implementation phase (Phase 13, §26).
 - Unchanged: the audio, pairing, TLS-PSK, the `hello`, the complete snapshot in every `state`, localization.
 
@@ -909,7 +909,7 @@ The intent asks for the private framework to be used only to act. Candidates for
 
 ### 25.2 Criteria
 
-"Go" requires every mandatory row to be green. The thresholds are fixed before measuring, as in §20.6.
+"Go" requires every mandatory row to be green. The thresholds were fixed in 3.1 (decision E3), before measuring, as in §20.6.
 
 | # | Criterion | Threshold | Mandatory |
 |---|---|---|---|
@@ -965,13 +965,15 @@ The commands go over the same authenticated session. New capability for a paired
 ## 27. Order relative to v2
 
 - **Phase 12 (spike)** doesn't touch the apps: it can run at any moment, before or between v2 phases.
-- **Phase 13** needs protocol v4 (Phase 7) and the iPad layout (Phase 8). Proposal: after Phase 8, and after Phase 11 if per-app volume is a "go", so the two capabilities don't fight over the same protocol version.
+- **Phase 13** needs protocol v4 (Phase 7) and the iPad layout (Phase 8). Decided (E4): after Phase 8, and after Phase 11 if per-app volume is a "go", so the two capabilities don't fight over the same protocol version.
 
-## 28. v3 decisions (open)
+## 28. v3 decisions
 
-| # | Decision | Proposal | Alternative |
+All four were **decided in 3.1**: the recommended option in every case. The alternatives are kept for the record.
+
+| # | Decision | Decided (3.1) | Alternatives and tradeoffs (for the record) |
 |---|---|---|---|
-| E1 | **Private-framework exception** for `SidecarCore` | Approve it under the intent's four conditions (§26.1 implements them) | Don't approve: v3 is dropped and documented. UI scripting isn't an acceptable alternative (§24.3) |
-| E2 | **Redefine LevelDeck** as a remote control for the Mac, starting with audio | Yes, with "one intent section per capability" as the brake | Keep it audio-only and make Sidecar a separate app sharing `LevelDeckKit` |
-| E3 | **Spike thresholds** (§25.2) | The proposed ones: 5 s connect, 3 s disconnect, 2 s external detection, 10 s max for an error | Looser if the user accepts it; fixed before measuring |
-| E4 | **Phase 13 order** | After Phase 8 (and Phase 11, if it exists) | Before the iPad layout, iPhone only, accepting rework in Phase 8 |
+| E1 | **Private-framework exception** for `SidecarCore` | Approved under the intent's four conditions; §26.1 implements them. `TCCAccessPreflight` (§20.3) stays excluded | *Don't approve*: v3 is dropped and documented. UI scripting isn't an acceptable alternative (§24.3) |
+| E2 | **Redefine LevelDeck** as a remote control for the Mac, starting with audio | Yes, with "one approved intent section per capability" as the brake | *Keep it audio-only and make Sidecar a separate app sharing `LevelDeckKit`*: a cleaner identity, but a second agent, pairing and login item for one button |
+| E3 | **Spike thresholds** (§25.2) | The proposed ones: 5 s connect, 3 s disconnect, 2 s external detection, 10 s max for an error | *Looser thresholds*: possible, but they had to be fixed before measuring so the result doesn't bend to the data |
+| E4 | **Phase 13 order** | After Phase 8, and after Phase 11 if it exists (§27) | *Before the iPad layout, iPhone only*: Sidecar sooner, but rework of the UI in Phase 8 and a protocol version fought over with Phase 11 |

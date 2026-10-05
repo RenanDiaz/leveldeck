@@ -103,9 +103,9 @@ The v1 ones, unchanged: Apple-native, local first, invisible on the Mac, simple 
 
 ---
 
-## v3 — draft
+## v3 — approved
 
-> Status: **draft** (2026-10-05). Written by the agent from a conversation; **not in force** until approved. While it's a draft, v1 and v2 (above) are the intent in force, including "Out of scope: … other Mac functions that aren't audio". The v3 spec (`SPEC.md`, Part III) is also a draft and only fixes the spike; nothing from v3 gets built until this section is approved and the spike is a "go".
+> Status: **approved** (2026-10-05). Written by the agent from a conversation and approved with the decisions recorded in `SPEC.md` §28. From here on, v1, v2 and this section together are the intent in force. This section lifts v1's "other Mac functions that aren't audio" exclusion **for Sidecar only**; everything else in it still holds. The v3 spec (`SPEC.md`, Part III) derives from this section: it fixes the spike and sketches the implementation, which only gets built if the spike is a "go".
 
 ### Why a v3
 
@@ -135,7 +135,7 @@ Nothing else in v3. Mirror vs. extend, the display arrangement and the sidebar o
 
 ### Principles
 
-The v1 and v2 ones, with **one bounded exception** that this section asks to approve:
+The v1 and v2 ones, with **one bounded exception**, approved:
 
 - **Apple-native, with one private framework, fenced.** Apple offers no public API to control Sidecar; the only clean route is the private `SidecarCore` framework (the UI-scripting alternative needs the Accessibility permission and breaks with every redesign of Control Center). v2 excluded private APIs for per-app volume (`SPEC.md` §20.3); v3 allows **this one** under four conditions:
   1. It's loaded at runtime, never linked. If it's missing or its shape changed, Sidecar shows as unavailable and nothing else is affected.
@@ -152,9 +152,14 @@ The v1 and v2 ones, with **one bounded exception** that this section asks to app
 - Sidecar settings (mirror or extend, arrangement, sidebar, Touch Bar).
 - Choosing wired vs. wireless Sidecar: whatever macOS picks.
 
-### Open questions
+### Open questions, answered
 
-- **Approve the private-framework exception?** It's the decision this whole section rests on. If not, v3 is dropped and the reason is documented: the alternative (UI scripting) contradicts "invisible on the Mac" and "simple before complete".
-- **Spike before or after v2?** The spike doesn't touch the apps and can run at any moment; the implementation needs protocol v4 and the iPad layout (v2 Phases 7 and 8). Proposal: spike whenever, implementation after Phase 8.
+- **The private-framework exception:** approved, under the four conditions above. UI scripting stays discarded: it contradicts "invisible on the Mac" and "simple before complete".
+- **What LevelDeck is:** a remote control for my Mac, starting with audio, with one approved section per capability as the brake.
+- **Spike thresholds:** fixed before measuring, as proposed in the spec (connect in ≤ 5 s, disconnect in ≤ 3 s, external changes seen in ≤ 2 s, errors in ≤ 10 s).
+- **Spike before or after v2:** the spike can run at any moment, since it doesn't touch the apps. The implementation comes after the iPad layout (v2 Phase 8), and after per-app volume if that one is a "go".
+
+### Still open (they don't block the spike)
+
 - **Where it lives in the interface.** Proposal: on the iPad, a "Display" item in the sidebar (or a button in the toolbar); on the iPhone, a compact row above the mixer. It must not push the faders out of their place.
 - **Is "LevelDeck" still the right name** for a remote control that does more than audio? Proposal: keep it; a "deck" is a control surface, and audio stays the core.
