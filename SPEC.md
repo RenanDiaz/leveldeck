@@ -1,7 +1,7 @@
 # SPEC — LevelDeck
 
 > Derived from `INTENT.md`. If anything here contradicts the intent, the intent wins.
-> Status: **Part I (v1)** — v1.7.1, implemented through Phase 5 (reconnection, haptics, login item and challenge-response for the `hello`; includes the two-step Mac Keychain read from v1.6.1; v1.7.1 is the English translation, no content changes). **Part II (v2)** — 2.1 (§13–§22): per-device strips, protocol v4, universal app, design audit and per-app volume spike. The intent's v2 section is approved and the §21 decisions are resolved; 2.1 folds them in.
+> Status: **Part I (v1)** — v1.7.1, implemented through Phase 5 (reconnection, haptics, login item and challenge-response for the `hello`; includes the two-step Mac Keychain read from v1.6.1; v1.7.1 is the English translation, no content changes). **Part II (v2)** — 2.1 (§13–§22): per-device strips, protocol v4, universal app, design audit and per-app volume spike. The intent's v2 section is approved and the §21 decisions are resolved; 2.1 folds them in. **Part III (v3)** — 3.1 (§23–§28): Sidecar control; the v3 intent is approved and the four §28 decisions are resolved; spike first, implementation only if it's a "go".
 
 ## 1. Summary
 
@@ -847,3 +847,133 @@ Complements §11. Everything automated runs in `scripts/verify.sh` and CI; whate
 - **Loopback integration:** `LoopbackIntegrationTests` with two clients on different strips of the same scope and on the same strip; `deviceNotFound` only to whoever asked; the v4 `state` arrives identical to both; a session receiving 100 strip events in 100 ms receives at most 4 `state` messages (coalescing). `PairingIntegrationTests`, `HelloAuthIntegrationTests` and `ReconnectTests` don't change: security doesn't change.
 - **Performance (manual, Phases 7 and 8):** RTT with 16 strips in the snapshot under 100 ms; on the iPad, dragging one strip with 16 on screen doesn't drop below 60 fps (Instruments, SwiftUI view body count: only the dragged strip re-evaluates at 30/s).
 - **Spike (Phase 10):** the §20.6 measurements are the "test"; the prototype has no automated tests.
+
+---
+
+# Part III — v3
+
+> Derived from the "v3" section of `INTENT.md` (approved). Status: **3.1**. Draft 3.0 listed four open decisions in §28 with a recommended option each; all four were decided (the recommended option in every case) and 3.1 records them. This part fixes the Sidecar spike (Phase 12) and the shape of the implementation (Phase 13), which is only built if the spike ends in a "go". Parts I and II remain the reference for everything else.
+
+## 23. v3 summary
+
+One conditional capability: **connecting and disconnecting Sidecar** (the iPad as a display for the Mac) from the iPhone and the iPad.
+
+- There's no public API. The only clean route is the private `SidecarCore` framework, which the v3 intent allows as a **fenced exception** (decision E1) to "system frameworks, nothing private" (§20.3 still excludes `TCCAccessPreflight`; the exception covers `SidecarCore` only).
+- First a throwaway spike with a go/no-go (Phase 12, §25). Only if it's a "go" is there an implementation phase (Phase 13, §26).
+- Unchanged: the audio, pairing, TLS-PSK, the `hello`, the complete snapshot in every `state`, localization.
+
+## 24. Sidecar: what's known
+
+### 24.1 Sources and status
+
+Taken from the source of SidecarLauncher (Ocasio-J/SidecarLauncher, `main.swift`), a CLI that controls Sidecar with `SidecarCore`. Its README says it was validated on macOS 14.2.1 and works on macOS 26.5.1, and that it can break with any macOS update. **Nothing below has been verified by this project yet**: confirming it on the user's Mac is the spike's first job (S1).
+
+| Element | Value (reported) |
+|---|---|
+| Framework | `/System/Library/PrivateFrameworks/SidecarCore.framework/SidecarCore`, loaded at runtime |
+| Manager | `SidecarDisplayManager`, `+sharedManager` |
+| Listing | `-devices`: the **reachable** eligible devices (not every iPad on the Apple ID) |
+| Device identity | `-name` only. SidecarLauncher matches by name, case-insensitively; no stable identifier is used |
+| Connect | `-connectToDevice:completion:`; or `-connectToDevice:withConfig:completion:` with a `SidecarDisplayConfig` whose `-setTransport:` takes `2` for wired |
+| Disconnect | `-disconnectFromDevice:completion:` |
+| Errors | The completion receives an `NSError?`. Locked or sleeping iPad → error `-203` ("wake and unlock, then retry") |
+
+Not known, and the spike has to answer:
+
+- Whether a `SidecarDevice` exposes a **stable identifier** (something other than the name) that survives reboots and renames.
+- Whether the manager exposes the **connected** device(s), and whether it notifies changes (KVO, `NSNotification`, distributed notification) or only answers when asked.
+- On which queue the completions run, and how long they take to arrive in the error cases (out of range, Bluetooth off, iPad asleep).
+- Whether anything asks for a permission or an entitlement from a non-sandboxed `LSUIElement` app signed with Apple Development (§12).
+
+### 24.2 Observing state: public first
+
+The intent asks for the private framework to be used only to act. Candidates for observation, in order of preference:
+
+1. **`CGDisplayRegisterReconfigurationCallback`** (public, CoreGraphics): fires when a display is added or removed. The spike checks whether the Sidecar display can be told apart from a physical one (vendor and model from `CGDisplayVendorNumber`/`CGDisplayModelNumber`, `NSScreen.localizedName` containing the iPad's name, or another trait) and whether it maps to the device in `-devices`.
+2. KVO or a notification from `SidecarCore`, if one exists.
+3. A **poll** of the private state at most at 1 Hz, and only while there's at least one connected client. Last resort.
+
+### 24.3 Alternatives evaluated and discarded
+
+| Alternative | Why not |
+|---|---|
+| UI scripting of Control Center (AppleScript / Accessibility) | Accessibility permission for the agent; breaks with every redesign of Control Center; it visibly opens a menu on the Mac. Contradicts "invisible on the Mac". |
+| A Shortcuts automation on the iPad that runs a script on the Mac over SSH (what SidecarLauncher offers) | Needs Remote Login (SSH) on the Mac and a second credential outside LevelDeck's security model. More attack surface, not less. |
+| A separate app | Duplicates agent, pairing and login item for one button (v3 intent, "Why a v3"). |
+
+## 25. Spike: go/no-go (Phase 12)
+
+### 25.1 Prototype
+
+`Spikes/SidecarSpike`: a minimal `LSUIElement` app, outside the apps and packages, signed like the agent (§12). It doesn't touch `LevelDeckKit`, `LevelDeckAgentKit`, the protocol or the agent. Its menu lists the devices, connects, disconnects and logs every event with a timestamp (call, completion, `CGDisplay` callback, observed state). It loads `SidecarCore` exactly the way the implementation would (§26.1), so S7 tests the real loading code. It ends in `Design/Sidecar/GO-NO-GO.md` with the macOS and iPadOS versions, the measurements and a recommendation.
+
+### 25.2 Criteria
+
+"Go" requires every mandatory row to be green. The thresholds were fixed in 3.1 (decision E3), before measuring, as in §20.6.
+
+| # | Criterion | Threshold | Mandatory |
+|---|---|---|---|
+| S1 | **Load and list** on the user's current macOS | The framework loads, the expected classes and selectors exist, and `-devices` lists the iPad (awake, unlocked, nearby, same Apple ID) | Yes |
+| S2 | **Connect** | Successful completion, and the display appears (`CGDisplay` callback) in ≤ 5 s wireless; the time is recorded | Yes |
+| S3 | **Disconnect** | The display disappears in ≤ 3 s | Yes |
+| S4 | **Permissions and entitlements** | No restricted entitlement, nothing that requires disabling SIP. A one-time TCC prompt is acceptable only if it's documented and survives rebuilds, as G9 | Yes |
+| S5 | **External changes are observed** | Connecting from Control Center and disconnecting from the iPad's sidebar are detected in ≤ 2 s, with public APIs (§24.2 option 1) or a poll at ≤ 1 Hz with negligible CPU | Yes |
+| S6 | **Errors never hang** | iPad locked, asleep, out of range, Bluetooth off on the Mac: the completion arrives with an error in ≤ 10 s, no crash, no main-thread stall > 100 ms. Each case's error code is recorded so the client can show a useful message | Yes |
+| S7 | **Graceful absence** | With the framework path, a class name or a selector deliberately wrong, the prototype reports "unavailable" with a reason and doesn't crash | Yes |
+| S8 | **Triggered from the target iPad** | With LevelDeck in the foreground on the iPad, connect (triggered from the prototype with a delay): the iPad becomes the display. After disconnecting, LevelDeck v1 comes back and reconnects on its own (§6.2) in ≤ 3 s | Yes |
+| S9 | **Sleep, wake and identity** | After the Mac sleeps and wakes, listing and connecting work without relaunching. Whether a stable identifier exists (§24.1) is recorded | Yes (the identifier is noted, not required) |
+| S10 | Wired transport (`setTransport: 2`) | Works with a cable, or is documented as unsupported | No |
+| S11 | Two eligible iPads | Both are listed; connecting one doesn't affect the other | No (only if a second iPad is available) |
+
+"Go with conditions" is the expected outcome if everything passes except that S5 only works with a poll: the poll runs only while a client is connected.
+
+## 26. Phase 13 sketch (only if "go")
+
+Detailed after the spike; this fixes the shape so the spike measures the right things.
+
+### 26.1 Isolation in the agent
+
+- **New module** `AgentSidecar` in `LevelDeckAgentKit`, behind a `SidecarControlling` protocol with a mock, like `AudioControlling`. `AudioModel` doesn't depend on it; `RemoteService` composes both.
+- `SidecarCoreController` is the only file that touches the private framework: `Bundle(path:)?.load()`, `NSClassFromString`, and before every call it checks `responds(to:)` **and** the method's type encoding (`method_getTypeEncoding`) against the expected one. A changed signature becomes "unavailable", never a call with the wrong arguments.
+- Availability is a closed enum: `available`, `unavailable(reason)` with `frameworkMissing`, `apiChanged`, `noEligibleDevices`. Unexpected errors from the completion are mapped to a closed set too (`deviceLocked`, `deviceUnreachable`, `failed`); the raw `NSError` only goes to Debug logs.
+- No other file in the repo imports or names `SidecarCore`. A check in `scripts/verify.sh` enforces it (grep for the framework and class names outside `SidecarCoreController.swift`).
+
+### 26.2 Protocol (next version: v5, or v6 if Phase 11 took v5)
+
+- The `state` gains `sidecar: { availability, devices: [{ id, name, state }] }`. `availability` is `"available"` or `"unavailable"` plus a `reason`. `state` per device: `disconnected`, `connecting`, `connected`, `disconnecting`. `id` is the stable identifier if S9 found one; otherwise, the name, and a rename on the iPad shows up as a new device.
+- Commands `sidecarConnect { id }` and `sidecarDisconnect { id }`. Unknown `id` → `deviceNotFound`. Failures → a new error code `sidecarFailed` with the closed `reason`.
+- Complete snapshot, as always: no separate Sidecar messages.
+
+### 26.3 Interface
+
+- iPad: a "Display" item in the sidebar, or a toolbar button. iPhone: one compact row above the mixer. Neither moves the faders.
+- If `availability` is `unavailable`, the control is shown disabled with the reason ("Not supported on this version of macOS", "No iPad nearby"). It isn't hidden: hiding it would look like a bug.
+- Mac menu: one row with the state and connect/disconnect, under the audio sections.
+- New strings in English and Spanish.
+
+### 26.4 Security
+
+The commands go over the same authenticated session. New capability for a paired device: taking over a display of the Mac. Accepted (v3 intent) and noted in §10's style when the phase closes. Revocation (§7) cuts it like everything else.
+
+### 26.5 Testing
+
+- `AgentSidecar` with the mock: availability mapping, state transitions, `deviceNotFound`, error mapping, the poll runs only with clients.
+- Protocol v5/v6 encoding: `sidecar` absent from the snapshot → decoding error (both apps are installed together), unknown `state` or `reason` → decoding error.
+- The `SidecarCore` check in `verify.sh`.
+- Manual checklist: S2, S3, S5, S6 and S8 repeated with the real apps.
+
+## 27. Order relative to v2
+
+- **Phase 12 (spike)** doesn't touch the apps: it can run at any moment, before or between v2 phases.
+- **Phase 13** needs protocol v4 (Phase 7) and the iPad layout (Phase 8). Decided (E4): after Phase 8, and after Phase 11 if per-app volume is a "go", so the two capabilities don't fight over the same protocol version.
+
+## 28. v3 decisions
+
+All four were **decided in 3.1**: the recommended option in every case. The alternatives are kept for the record.
+
+| # | Decision | Decided (3.1) | Alternatives and tradeoffs (for the record) |
+|---|---|---|---|
+| E1 | **Private-framework exception** for `SidecarCore` | Approved under the intent's four conditions; §26.1 implements them. `TCCAccessPreflight` (§20.3) stays excluded | *Don't approve*: v3 is dropped and documented. UI scripting isn't an acceptable alternative (§24.3) |
+| E2 | **Redefine LevelDeck** as a remote control for the Mac, starting with audio | Yes, with "one approved intent section per capability" as the brake | *Keep it audio-only and make Sidecar a separate app sharing `LevelDeckKit`*: a cleaner identity, but a second agent, pairing and login item for one button |
+| E3 | **Spike thresholds** (§25.2) | The proposed ones: 5 s connect, 3 s disconnect, 2 s external detection, 10 s max for an error | *Looser thresholds*: possible, but they had to be fixed before measuring so the result doesn't bend to the data |
+| E4 | **Phase 13 order** | After Phase 8, and after Phase 11 if it exists (§27) | *Before the iPad layout, iPhone only*: Sidecar sooner, but rework of the UI in Phase 8 and a protocol version fought over with Phase 11 |

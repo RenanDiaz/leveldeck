@@ -100,3 +100,66 @@ The v1 ones, unchanged: Apple-native, local first, invisible on the Mac, simple 
 - **The mixer on the iPhone with ten strips:** horizontal scrolling, Output above and Input below. But the gesture (a vertical fader inside a horizontal scroll) gets validated on a real iPhone before the mixer is built; if it can't be made to feel right, it becomes two tabs, Output and Input.
 - **Strip order:** stable, by name, with the default highlighted. The fader I'm dragging never moves because something else changed: strips are identified by device, never by position, and a device plugged in mid-drag waits until I let go.
 - **Per-app volume:** I accept exploring it with a spike, on one condition beyond the measurements: an app at 100 % must have no tap at all. Its audio never goes through the agent and gains no latency; only the apps I actually turn down pay the cost, and only while they're turned down.
+
+---
+
+## v3 — approved
+
+> Status: **approved** (2026-10-05). Written by the agent from a conversation and approved with the decisions recorded in `SPEC.md` §28. From here on, v1, v2 and this section together are the intent in force. This section lifts v1's "other Mac functions that aren't audio" exclusion **for Sidecar only**; everything else in it still holds. The v3 spec (`SPEC.md`, Part III) derives from this section: it fixes the spike and sketches the implementation, which only gets built if the spike is a "go".
+
+### Why a v3
+
+I use the iPad as a second display for my Mac (Sidecar). To turn it on or off I have to be at the Mac: Control Center › Screen Mirroring › iPad. It's the same friction v1 removed for the volume: a Mac function I use often, behind a menu, when the device I'd like to press is the one I'm holding.
+
+LevelDeck already has the hard part of a remote control for my Mac: an agent that lives in the menu bar and starts on its own, discovery, QR pairing, TLS-PSK with one key per device, revocation and reconnection. A second app would duplicate all of that (two agents, two pairings, two login items) for one more button. So the capability goes into LevelDeck.
+
+### What LevelDeck becomes
+
+From "remote control for the Mac's audio" to **"remote control for my Mac from my iPhone and iPad, starting with audio"**.
+
+That's not a license to add anything. LevelDeck doesn't become a generic "control center" or a plugin system. Each new capability enters the way v2 and v3 did: its own section in this document, approved, with its own definition of "it works" and its own out of scope. Audio stays the core: it's what opens first and what gets the most space.
+
+### What "it works" means
+
+- From the iPhone or the iPad I see whether Sidecar is connected and to which iPad, and with one tap I connect or disconnect it.
+- From the iPad itself, one tap and that iPad becomes the Mac's display. LevelDeck disappears behind Sidecar; that's expected. When Sidecar ends (from the iPad's sidebar, from the Mac or from the iPhone), LevelDeck comes back and reconnects on its own.
+- If Sidecar is connected or disconnected outside LevelDeck (Control Center, the iPad's sidebar, closing the lid), every connected device reflects it. The v1 rule holds: both sides always tell the same truth.
+- If Sidecar can't be controlled (a macOS update broke it, the iPad isn't eligible, Bluetooth or Handoff is off), LevelDeck says so plainly and **the audio works exactly the same**. Sidecar never takes the audio down with it.
+- The display starts appearing within a few seconds of the tap, about as fast as from Control Center.
+
+### What I want to control
+
+1. Connect and disconnect Sidecar to any of my eligible iPads.
+
+Nothing else in v3. Mirror vs. extend, the display arrangement and the sidebar or Touch Bar settings stay in System Settings › Displays.
+
+### Principles
+
+The v1 and v2 ones, with **one bounded exception**, approved:
+
+- **Apple-native, with one private framework, fenced.** Apple offers no public API to control Sidecar; the only clean route is the private `SidecarCore` framework (the UI-scripting alternative needs the Accessibility permission and breaks with every redesign of Control Center). v2 excluded private APIs for per-app volume (`SPEC.md` §20.3); v3 allows **this one** under four conditions:
+  1. It's loaded at runtime, never linked. If it's missing or its shape changed, Sidecar shows as unavailable and nothing else is affected.
+  2. It lives behind its own protocol, in its own module, like `AudioControlling`. The audio code doesn't know it exists.
+  3. It's used only to act (connect, disconnect, list). Observing the state uses public APIs wherever possible.
+  4. The exception doesn't extend to anything else. A future capability that also needs private APIs asks for its own exception.
+- **The security model isn't touched.** Same pairing, same keys, same `hello`. What's new is what a paired device can do: take over a display of my Mac. Accepted, because paired devices are mine and revocation already exists.
+
+### Out of scope (for v3)
+
+- Everything still out from v1 and v2: App Store, control outside the local network, DAWs and media, other platforms.
+- Other Mac functions (brightness, lock the screen, sleep, open apps, media keys). Each one, if it ever comes, needs its own section.
+- AirPlay mirroring to a TV or another Mac, and Universal Control.
+- Sidecar settings (mirror or extend, arrangement, sidebar, Touch Bar).
+- Choosing wired vs. wireless Sidecar: whatever macOS picks.
+
+### Open questions, answered
+
+- **The private-framework exception:** approved, under the four conditions above. UI scripting stays discarded: it contradicts "invisible on the Mac" and "simple before complete".
+- **What LevelDeck is:** a remote control for my Mac, starting with audio, with one approved section per capability as the brake.
+- **Spike thresholds:** fixed before measuring, as proposed in the spec (connect in ≤ 5 s, disconnect in ≤ 3 s, external changes seen in ≤ 2 s, errors in ≤ 10 s).
+- **Spike before or after v2:** the spike can run at any moment, since it doesn't touch the apps. The implementation comes after the iPad layout (v2 Phase 8), and after per-app volume if that one is a "go".
+
+### Still open (they don't block the spike)
+
+- **Where it lives in the interface.** Proposal: on the iPad, a "Display" item in the sidebar (or a button in the toolbar); on the iPhone, a compact row above the mixer. It must not push the faders out of their place.
+- **Is "LevelDeck" still the right name** for a remote control that does more than audio? Proposal: keep it; a "deck" is a control surface, and audio stays the core.
